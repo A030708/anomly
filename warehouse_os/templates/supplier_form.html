@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Add Supplier{% endblock %}
+{% block header_title %}Supplier Registry{% endblock %}
+{% block content %}
+
+<h1 class="wos-page-title" style="margin-bottom: 24px;">Add Supplier</h1>
+
+<div style="max-width: 520px;">
+  <form method="POST" class="wos-card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px;">Supplier Name</label>
+      <input name="name" required placeholder="e.g. Acme Hardware Supply" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px;">Contact Email</label>
+      <input name="contact_email" type="email" placeholder="supplier@example.com" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px;">Phone</label>
+      <input name="phone" placeholder="+91 98765 43210" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px;">Lead Time (days)</label>
+      <input name="lead_time_days" type="number" min="1" value="7" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <button type="submit" class="wos-btn wos-btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+      <i class="fa-solid fa-floppy-disk"></i> Save Supplier
+    </button>
+  </form>
+</div>
+
+{% endblock %}

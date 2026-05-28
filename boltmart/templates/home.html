@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}BoltMart - Industrial Hardware{% endblock %}
+{% block content %}
+
+<div class="bm-hero">
+    <h1 class="bm-hero-title">Industrial Hardware & Tools</h1>
+    <p class="bm-hero-subtitle">Professional grade equipment for professionals.</p>
+    <a href="{{ url_for('shop') }}" class="bm-btn bm-btn-accent" style="font-size:18px; padding: 16px 32px;">
+        Browse Products <i class="fas fa-arrow-right"></i>
+    </a>
+</div>
+
+<div class="bm-grid">
+    <div class="bm-card" style="border-top: 4px solid var(--bm-primary);">
+        <h3 class="bm-card-title">Power Tools</h3>
+        <p class="bm-card-desc">Drills, Grinders, Saws</p>
+        <a href="{{ url_for('shop', category='Power Tools') }}" class="bm-nav-link" style="color:var(--bm-primary); font-weight:600;">View All <i class="fas fa-arrow-right" style="font-size:12px;"></i></a>
+    </div>
+    <div class="bm-card" style="border-top: 4px solid #10b981;">
+        <h3 class="bm-card-title">Safety Gear</h3>
+        <p class="bm-card-desc">Helmets, Gloves, Goggles</p>
+        <a href="{{ url_for('shop', category='Safety Gear') }}" class="bm-nav-link" style="color:#10b981; font-weight:600;">View All <i class="fas fa-arrow-right" style="font-size:12px;"></i></a>
+    </div>
+    <div class="bm-card" style="border-top: 4px solid var(--bm-secondary);">
+        <h3 class="bm-card-title">Hand Tools</h3>
+        <p class="bm-card-desc">Wrenches, Hammers, Tapes</p>
+        <a href="{{ url_for('shop', category='Hand Tools') }}" class="bm-nav-link" style="color:var(--bm-secondary); font-weight:600;">View All <i class="fas fa-arrow-right" style="font-size:12px;"></i></a>
+    </div>
+</div>
+
+{% if show_track_search %}
+<div class="bm-glass-panel" style="max-width: 500px; margin: 48px auto 0 auto;">
+    <h2 class="bm-page-title" style="font-size:24px;">Track Your Order</h2>
+    <form method="POST" action="{{ url_for('track_search') }}">
+        <div class="bm-form-group">
+            <input type="text" name="order_id" placeholder="Enter Order ID (e.g. ORD-2024-0001)" class="bm-input" required>
+        </div>
+        <button type="submit" class="bm-btn bm-btn-primary" style="width:100%;">
+            Track Order
+        </button>
+    </form>
+</div>
+{% endif %}
+
+{% endblock %}

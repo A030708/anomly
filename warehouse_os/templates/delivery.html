@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Delivery Queue{% endblock %}
+{% block header_title %}Delivery Queue{% endblock %}
+{% block content %}
+
+<style>
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal-box { background: white; border-radius: 16px; padding: 28px; width: 100%; max-width: 440px; box-shadow: 0 25px 50px rgba(0,0,0,0.25); }
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 class="wos-page-title" style="margin-bottom: 4px;">Out for Delivery</h1>
+    <p style="color: var(--wos-text-muted); font-size: 14px;">Orders marked as shipped — ready for delivery confirmation.</p>
+  </div>
+  <span class="wos-badge wos-badge-info" style="font-size: 13px;">{{ orders|length }} orders</span>
+</div>
+
+<div class="wos-table-wrapper">
+  <table class="wos-table">
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Customer</th>
+        <th>Items</th>
+        <th>Total</th>
+        <th>Payment</th>
+        <th>Shipped</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in orders %}
+      <tr>
+        <td style="font-family: monospace; font-weight: 500; font-size: 12px;">{{ order.order_id[:16] }}..</td>
+        <td style="font-weight: 600; font-size: 13px;">{{ order.customer_name }}</td>
+        <td style="font-size: 13px;">{{ order.items|length if order.items is iterable and not order.items is string else '—' }}</td>
+        <td style="font-weight: 600;">₹{{ "%.0f"|format(order.total_value or 0) }}</td>
+        <td>
+          {% if order.payment_method == 'cod' %}
+          <span class="wos-badge wos-badge-warning" style="font-size: 11px;">COD ₹{{ "%.0f"|format(order.total_value or 0) }}</span>
+          {% else %}
+          <span class="wos-badge wos-badge-success" style="font-size: 11px;">Prepaid</span>
+          {% endif %}
+        </td>
+        <td style="font-size: 12px; color: var(--wos-text-muted);">{{ order.updated_at[:16].replace('T', ' ') if order.updated_at else '—' }}</td>
+        <td>
+          <button class="wos-btn wos-btn-success" style="padding: 6px 14px; font-size: 13px;" onclick="openModal('{{ order.order_id }}', '{{ order.customer_name }}', '{{ order.payment_method }}', {{ order.total_value or 0 }})">
+            <i class="fa-solid fa-check"></i> Deliver
+          </button>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 48px; color: var(--wos-text-muted);">
+          <i class="fa-solid fa-truck" style="font-size: 40px; margin-bottom: 12px; color: var(--wos-accent); display: block;"></i>
+          <p style="font-size: 16px; font-weight: 600; margin-bottom: 4px;">No orders out for delivery</p>
+          <p style="font-size: 13px;">All shipped orders have been delivered.</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Delivery Confirmation Modal -->
+<div id="delivery-modal" class="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h3 style="font-size: 18px; font-weight: 700;">Confirm Delivery</h3>
+      <button onclick="closeModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #94a3b8;">&times;</button>
+    </div>
+
+    <form id="delivery-form" method="POST" style="display: flex; flex-direction: column; gap: 16px;">
+      <input type="hidden" name="order_id" id="modal-order-id">
+
+      <div>
+        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #334155;">
+          Recipient Name <span style="color: #dc2626;">*</span>
+        </label>
+        <input name="recipient_name" id="modal-recipient" required
+               placeholder="e.g. Rahul Sharma"
+               style="width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: inherit; font-size: 14px; outline: none; background: #f8fafc; box-sizing: border-box;"
+               onfocus="this.style.borderColor='#3b82f6'; this.style.background='white'"
+               onblur="this.style.borderColor='#e2e8f0'; this.style.background='#f8fafc'">
+      </div>
+
+      <div>
+        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #334155;">
+          Delivery Notes <span style="color: #64748b; font-size: 12px; font-weight: 400;">(optional)</span>
+        </label>
+        <textarea name="delivery_notes" rows="2" placeholder="e.g. Left at front door, customer signed"
+                  style="width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: inherit; font-size: 14px; outline: none; background: #f8fafc; resize: vertical; box-sizing: border-box;"
+                  onfocus="this.style.borderColor='#3b82f6'; this.style.background='white'"
+                  onblur="this.style.borderColor='#e2e8f0'; this.style.background='#f8fafc'"></textarea>
+      </div>
+
+      <!-- Payment Collection (COD) -->
+      <div id="payment-section" style="display: none; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 16px;">
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+          <input type="checkbox" name="payment_collected" style="width: 18px; height: 18px; accent-color: #16a34a;">
+          <div>
+            <strong style="font-size: 14px; color: #92400e;">Payment Collected</strong>
+            <div style="font-size: 12px; color: #b45309;">Collect <strong id="modal-cod-amount">₹0</strong> from customer</div>
+          </div>
+        </label>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 8px;">
+        <button type="button" class="wos-btn wos-btn-secondary" style="flex: 1; padding: 12px;" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="wos-btn wos-btn-success" style="flex: 1; padding: 12px; font-weight: 700;">
+          <i class="fa-solid fa-check"></i> Confirm Delivery
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  let currentPaymentMethod = '';
+
+  function openModal(orderId, customerName, paymentMethod, totalValue) {
+    document.getElementById('modal-order-id').value = orderId;
+    document.getElementById('modal-recipient').placeholder = 'e.g. ' + customerName;
+    currentPaymentMethod = paymentMethod;
+
+    const paymentSection = document.getElementById('payment-section');
+    if (paymentMethod === 'cod') {
+      paymentSection.style.display = 'block';
+      document.getElementById('modal-cod-amount').textContent = '₹' + totalValue.toLocaleString('en-IN');
+    } else {
+      paymentSection.style.display = 'none';
+    }
+
+    document.getElementById('delivery-modal').classList.add('active');
+  }
+
+  function closeModal(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('delivery-modal').classList.remove('active');
+  }
+
+  document.getElementById('delivery-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const orderId = document.getElementById('modal-order-id').value;
+    this.action = '/delivery/' + encodeURIComponent(orderId) + '/deliver';
+    this.submit();
+  });
+</script>
+
+{% endblock %}

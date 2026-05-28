@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}PO {{ po.po_number }}{% endblock %}
+{% block header_title %}Purchase Order {{ po.po_number }}{% endblock %}
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+  <div>
+    <h1 class="wos-page-title" style="margin-bottom: 4px; font-family: monospace;">{{ po.po_number }}</h1>
+    <p style="color: var(--wos-text-muted); font-size: 14px;">
+      Supplier: <strong>{{ supplier.name if supplier else 'N/A' }}</strong>
+      {% if supplier and supplier.contact_email %} &middot; {{ supplier.contact_email }}{% endif %}
+    </p>
+  </div>
+  <div style="display: flex; gap: 8px; align-items: center;">
+    <span class="wos-badge {% if po.status == 'sent' %}wos-badge-info{% elif po.status == 'received' %}wos-badge-success{% elif po.status == 'cancelled' %}wos-badge-danger{% endif %}" style="font-size: 13px; padding: 6px 14px;">
+      {{ po.status | upper }}
+    </span>
+    {% if po.status == 'sent' %}
+    <a href="{{ url_for('stock_in', po=po.id) }}" class="wos-btn wos-btn-primary">
+      <i class="fa-solid fa-arrow-down"></i> Receive Stock
+    </a>
+    <form method="POST" action="{{ url_for('purchase_order_cancel', po_id=po.id) }}" style="display: inline;" onsubmit="return confirm('Cancel PO {{ po.po_number }}?')">
+      <button class="wos-btn wos-btn-danger"><i class="fa-solid fa-ban"></i> Cancel</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+  <div class="wos-card" style="padding: 16px 20px;">
+    <div style="font-size: 12px; color: var(--wos-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Value</div>
+    <div style="font-size: 24px; font-weight: 700;">₹{{ "%.0f"|format(po.total_value or 0) }}</div>
+  </div>
+  <div class="wos-card" style="padding: 16px 20px;">
+    <div style="font-size: 12px; color: var(--wos-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Created</div>
+    <div style="font-size: 16px; font-weight: 600;">{{ po.created_at[:16].replace('T', ' ') }}</div>
+  </div>
+</div>
+
+<div class="wos-table-wrapper">
+  <table class="wos-table">
+    <thead>
+      <tr>
+        <th>SKU</th>
+        <th>Product</th>
+        <th>Unit Value</th>
+        <th>Ordered</th>
+        <th>Received</th>
+        <th>Remaining</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      {% set p = product_map.get(item.sku) %}
+      {% set remaining = item.ordered_qty - item.received_qty %}
+      <tr>
+        <td style="font-family: monospace; font-weight: 500; font-size: 13px;">{{ item.sku }}</td>
+        <td>{{ p.name if p else item.sku }}</td>
+        <td>₹{{ "%.0f"|format(item.unit_value or 0) }}</td>
+        <td>{{ item.ordered_qty }}</td>
+        <td>{{ item.received_qty }}</td>
+        <td style="font-weight: 600;">{{ remaining }}</td>
+        <td>
+          {% if remaining <= 0 %}
+          <span class="wos-badge wos-badge-success">Complete</span>
+          {% elif item.received_qty > 0 %}
+          <span class="wos-badge wos-badge-warning">Partial</span>
+          {% else %}
+          <span class="wos-badge wos-badge-neutral">Pending</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--wos-text-muted);">No items on this PO.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if po.notes %}
+<div class="wos-card" style="padding: 16px 20px; margin-top: 16px;">
+  <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">Notes</div>
+  <div style="color: var(--wos-text-muted); font-size: 14px;">{{ po.notes }}</div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Fulfillment Queue{% endblock %}
+{% block header_title %}Fulfillment Queue{% endblock %}
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h1 class="wos-page-title" style="margin-bottom: 0;">Fulfillment Queue</h1>
+
+    <div style="display: flex; gap: 8px;">
+        {% for s in ['pending', 'packed', 'shipped', 'delivered'] %}
+        <a href="{{ url_for('fulfillment', status=s) }}" class="wos-btn {% if status == s %}wos-btn-primary{% else %}wos-btn-secondary{% endif %}">
+            {{ s|capitalize }}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="wos-card wos-table-wrapper">
+    <table class="wos-table">
+        <thead>
+            <tr>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>City</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td style="font-family: monospace; font-weight: 500;">{{ order.order_id }}</td>
+                <td>{{ order.customer_name }}</td>
+                <td>{{ order.city }}</td>
+                <td style="font-weight: 500;">
+                    &#8377;{{ "%.0f"|format(order.total_value or 0) }}
+                    {% if order.total_value is not none and order.total_value <= invoice_threshold %}
+                    <span class="wos-badge wos-badge-success" style="font-size: 10px; margin-left: 4px;">AUTO</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="wos-badge {% if order.status == 'pending' %}wos-badge-warning{% elif order.status == 'delivered' %}wos-badge-success{% else %}wos-badge-info{% endif %}">
+                        {{ order.status }}
+                    </span>
+                </td>
+                <td style="color: var(--wos-text-muted);">{{ order.created_at[:19].replace('T', ' ') if order.created_at else '' }}</td>
+                <td style="text-align: right;">
+                    <a href="{{ url_for('order_detail', order_id=order.order_id) }}" class="wos-btn wos-btn-secondary" style="padding: 4px 12px; font-size: 13px;">
+                        Open
+                    </a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 32px; color: var(--wos-text-muted);">
+                    <i class="fa-solid fa-clipboard-list" style="font-size: 32px; margin-bottom: 12px; color: #cbd5e1;"></i>
+                    <p>No {{ status }} orders.</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

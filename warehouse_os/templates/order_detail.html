@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Order {{ order.order_id }}{% endblock %}
+{% block header_title %}Order {{ order.order_id }}{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('fulfillment') }}" style="color: var(--wos-accent); font-weight: 600; text-decoration: none; margin-bottom: 24px; display: inline-block;">
+  &larr; Back to Fulfillment
+</a>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+
+  <div class="wos-card" style="padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+      <div>
+        <h1 style="font-size: 24px; font-weight: 700; font-family: monospace; line-height: 1.2;">{{ order.order_id }}</h1>
+        <p style="color: var(--wos-text-muted); font-size: 14px;">BoltMart customer order</p>
+      </div>
+      <span class="wos-badge {% if order.status == 'pending' %}wos-badge-warning{% elif order.status == 'delivered' %}wos-badge-success{% elif order.status == 'shipped' %}wos-badge-info{% elif order.status == 'packed' %}wos-badge-info{% else %}wos-badge-neutral{% endif %}">
+        {{ order.status }}
+      </span>
+    </div>
+
+    <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">Pick List</h2>
+
+    <div class="wos-table-wrapper" style="margin-bottom: 24px; border: none; box-shadow: none;">
+      <table class="wos-table">
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in order["items"] %}
+          <tr>
+            <td style="font-family: monospace; color: var(--wos-text-muted);">{{ item.sku }}</td>
+            <td>{{ item.name }}</td>
+            <td style="font-weight: 700;">{{ item.quantity }}</td>
+            <td>&#8377;{{ "%.0f"|format(item.unit_price or 0) }}</td>
+            <td style="font-weight: 500;">&#8377;{{ "%.0f"|format(item.line_total or 0) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if order.status in ['pending', 'assigned'] %}
+    <form method="POST" action="{{ url_for('mark_packed', order_id=order.order_id) }}" style="margin-bottom: 12px;">
+      <button class="wos-btn" style="background: var(--wos-success); color: white; padding: 12px 24px; font-size: 15px; font-weight: 600; width: 100%;">
+        <i class="fa-solid fa-box-open"></i> Mark as Packed
+      </button>
+    </form>
+    {% endif %}
+
+    {% if order.status == 'packed' and current_user.role in ['admin', 'manager'] %}
+    <form method="POST" action="{{ url_for('mark_shipped', order_id=order.order_id) }}" style="margin-bottom: 12px;">
+      <button class="wos-btn" style="background: var(--wos-accent); color: white; padding: 12px 24px; font-size: 15px; font-weight: 600; width: 100%;">
+        <i class="fa-solid fa-ship"></i> Mark as Shipped
+      </button>
+    </form>
+    {% endif %}
+
+    {% if order.status == 'shipped' and current_user.role in ['admin', 'manager'] %}
+    <form method="POST" action="{{ url_for('mark_delivered', order_id=order.order_id) }}" style="margin-bottom: 12px;">
+      <button class="wos-btn" style="background: var(--wos-success); color: white; padding: 12px 24px; font-size: 15px; font-weight: 600; width: 100%;">
+        <i class="fa-solid fa-check-circle"></i> Mark as Delivered
+      </button>
+    </form>
+    {% endif %}
+
+    {% if order.status not in ['pending', 'assigned', 'packed', 'shipped'] %}
+    <div style="background: var(--wos-bg); padding: 16px; border-radius: var(--wos-radius-md); color: var(--wos-text-muted); font-size: 14px; border: 1px solid var(--wos-border);">
+      <i class="fa-solid fa-circle-check" style="margin-right: 8px; color: var(--wos-success);"></i> This order has been delivered.
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="wos-card" style="padding: 24px; height: fit-content;">
+    <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">Customer Details</h2>
+    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 14px;">
+      <p><strong style="color: var(--wos-text-muted); display: inline-block; width: 80px;">Name:</strong> {{ order.customer_name }}</p>
+      <p><strong style="color: var(--wos-text-muted); display: inline-block; width: 80px;">Phone:</strong> {{ order.phone }}</p>
+      <p><strong style="color: var(--wos-text-muted); display: inline-block; width: 80px;">Email:</strong> {{ order.email }}</p>
+      <div>
+        <strong style="color: var(--wos-text-muted); margin-bottom: 4px; display: block;">Address:</strong>
+        <div style="background: var(--wos-bg); padding: 12px; border-radius: var(--wos-radius-sm); border: 1px solid var(--wos-border);">
+          {{ order.address }}<br>
+          {{ order.city }} - {{ order.pincode }}
+        </div>
+      </div>
+      <div style="border-top: 1px solid var(--wos-border); margin-top: 8px; padding-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+        <strong style="color: var(--wos-text-muted);">Total:</strong>
+        <span style="font-size: 18px; font-weight: 700;">&#8377;{{ "%.0f"|format(order.total_value or 0) }}</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

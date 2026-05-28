@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Log - {{ platform_name }}{% endblock %}
+{% block page_title %}System Audit Log{% endblock %}
+{% block breadcrumb %}Audit Log{% endblock %}
+
+{% block extra_css %}
+<style>
+    .audit-filter-bar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 14px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+    .audit-input, .audit-select {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 13px;
+        outline: none;
+    }
+    .audit-input:focus { border-color: #00d4ff; }
+    .audit-input::placeholder { color: rgba(255,255,255,0.35); }
+    .audit-select option { background: #1a2035; }
+    .log-row {
+        transition: background 0.15s;
+        border-left: 3px solid transparent;
+    }
+    .log-row:hover td {
+        background: rgba(255,255,255,0.02);
+    }
+    .log-row.critical { border-left-color: #ff4757; }
+    .log-row.warning  { border-left-color: #ffd700; }
+    .log-row.info     { border-left-color: #00d4ff; }
+    .log-row.success  { border-left-color: #00ff88; }
+    .action-badge {
+        padding: 3px 9px;
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .action-login    { background:rgba(0,212,255,0.12); color:#00d4ff; }
+    .action-config   { background:rgba(168,85,247,0.12);color:#a855f7; }
+    .action-delete   { background:rgba(255,71,87,0.12);  color:#ff4757; }
+    .action-export   { background:rgba(255,215,0,0.12);  color:#ffd700; }
+    .action-create   { background:rgba(0,255,136,0.12);  color:#00ff88; }
+    .action-update   { background:rgba(255,107,53,0.12); color:#ff6b35; }
+    .status-badge {
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+    .status-success { background:rgba(0,255,136,0.12); color:#00ff88; }
+    .status-failure { background:rgba(255,71,87,0.15); color:#ff4757; }
+    .ip-address {
+        font-family: monospace;
+        font-size: 12px;
+        color: #00d4ff;
+    }
+    .log-details-expand {
+        display: none;
+        background: rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 6px;
+        padding: 10px;
+        margin-top: 8px;
+        font-size: 11px;
+        color: var(--text-muted);
+        font-family: monospace;
+        white-space: pre-wrap;
+    }
+    .log-row.expanded .log-details-expand { display: block; }
+    .expand-btn {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+    .expand-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+    .timeline-chart-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Stats -->
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Total Events',    stats.total,      '#e2e8f0', 'fas fa-list'),
+        ('Failed Logins',   stats.failed_logins,'#ff4757','fas fa-lock-open'),
+        ('Config Changes',  stats.config_changes,'#a855f7','fas fa-sliders-h'),
+        ('Critical Actions',stats.critical,   '#ffd700', 'fas fa-exclamation-triangle'),
+        ('Data Exports',    stats.exports,    '#00d4ff', 'fas fa-file-export'),
+    ] %}
+    {% for label, value, color, icon in kpis %}
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:24px;">{{ value }}</div>
+                </div>
+                <i class="{{ icon }}" style="color:{{ color }};font-size:24px;opacity:0.5;"></i>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Activity Timeline Chart -->
+<div class="timeline-chart-card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <i class="fas fa-chart-area" style="color:#00d4ff;margin-right:8px;"></i>
+            <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Audit Activity (24h)</span>
+        </div>
+        <select class="audit-select" style="font-size:11px;padding:4px 8px;">
+            <option>Last 24 Hours</option>
+            <option>Last 7 Days</option>
+            <option>Last 30 Days</option>
+        </select>
+    </div>
+    <div style="position: relative; height: 100px; width: 100%;">
+        <canvas id="auditTimelineChart"></canvas>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="audit-filter-bar">
+    <i class="fas fa-filter" style="color:var(--text-muted);font-size:12px;"></i>
+    <input type="text" class="audit-input" id="logSearch"
+           placeholder="Search user, action, IP..." style="flex:1;min-width:180px;">
+    <input type="datetime-local" class="audit-input" id="startTime">
+    <input type="datetime-local" class="audit-input" id="endTime">
+    <select class="audit-select" id="actionFilter">
+        <option value="">All Actions</option>
+        <option value="login">Login</option>
+        <option value="config">Config Change</option>
+        <option value="delete">Delete</option>
+        <option value="create">Create</option>
+        <option value="export">Export</option>
+    </select>
+    <select class="audit-select" id="statusFilter">
+        <option value="">All Statuses</option>
+        <option value="success">Success</option>
+        <option value="failure">Failure</option>
+    </select>
+    <div class="ms-auto d-flex gap-2">
+        <button onclick="exportLogs()"
+                style="padding:7px 14px;background:rgba(255,255,255,0.05);
+                       border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);
+                       border-radius:8px;font-size:12px;cursor:pointer;">
+            <i class="fas fa-download"></i> Export
+        </button>
+        <button onclick="applyFilters()"
+                class="btn-primary-custom" style="padding:7px 14px;font-size:12px;">
+            <i class="fas fa-search"></i> Search
+        </button>
+    </div>
+</div>
+
+<!-- Audit Table -->
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-clipboard-list" style="color:#a855f7;"></i>
+        <span class="card-title">Audit Events</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:8px;"
+              id="logCount">{{ logs|length }} events</span>
+        <div class="ms-auto">
+            <select class="audit-select" id="perPageSelect"
+                    style="font-size:11px;padding:4px 10px;">
+                <option value="50">50 per page</option>
+                <option value="100">100 per page</option>
+                <option value="200">200 per page</option>
+            </select>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table" id="auditTable">
+            <thead>
+                <tr>
+                    <th style="width:40px;"></th>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Resource</th>
+                    <th>IP Address</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="auditBody">
+                {% for log in logs %}
+                <tr class="log-row {{ log.level|lower }}"
+                    data-action="{{ log.action|lower }}"
+                    data-status="{{ log.status|lower }}">
+                    <td>
+                        <button class="expand-btn" onclick="toggleLogDetail(this)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </td>
+                    <td style="font-size:11px;color:var(--text-muted);white-space:nowrap;">
+                        {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else 'N/A' }}
+                    </td>
+                    <td style="font-size:12px;font-weight:500;color:var(--text-primary);">
+                        {{ log.user or 'System' }}
+                    </td>
+                    <td>
+                        <span class="action-badge action-{{ log.action|lower }}">
+                            {{ log.action }}
+                        </span>
+                    </td>
+                    <td style="font-size:12px;color:var(--text-secondary);max-width:200px;
+                               overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        {{ log.resource or 'N/A' }}
+                    </td>
+                    <td>
+                        <span class="ip-address">{{ log.ip_address or '127.0.0.1' }}</span>
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ log.status|lower }}">
+                            {{ log.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="log-details-expand">
+                            <div style="margin-bottom:4px;color:var(--text-muted);">
+                                <strong>Request ID:</strong> {{ log.request_id or 'N/A' }}
+                            </div>
+                            <div style="margin-bottom:4px;color:var(--text-muted);">
+                                <strong>User Agent:</strong> {{ log.user_agent or 'N/A' }}
+                            </div>
+                            <div style="color:#ffd700;">
+                                <strong>Changes:</strong> {{ log.changes or 'None' }}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div style="display:flex;justify-content:space-between;align-items:center;
+                padding:14px 20px;border-top:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:12px;color:var(--text-muted);">
+            Showing {{ logs|length }} of {{ stats.total }} events
+        </div>
+        <div class="d-flex gap-2">
+            <button style="padding:5px 12px;background:rgba(255,255,255,0.05);
+                           border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);
+                           border-radius:6px;font-size:12px;cursor:pointer;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <span style="padding:5px 12px;background:rgba(0,212,255,0.1);
+                         border:1px solid rgba(0,212,255,0.2);color:#00d4ff;
+                         border-radius:6px;font-size:12px;">1</span>
+            <button style="padding:5px 12px;background:rgba(255,255,255,0.05);
+                           border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);
+                           border-radius:6px;font-size:12px;cursor:pointer;">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleLogDetail(btn) {
+    const row = btn.closest('tr');
+    const icon = btn.querySelector('i');
+    row.classList.toggle('expanded');
+    if (row.classList.contains('expanded')) {
+        icon.classList.replace('fa-chevron-right', 'fa-chevron-down');
+    } else {
+        icon.classList.replace('fa-chevron-down', 'fa-chevron-right');
+    }
+}
+
+function applyFilters() {
+    const search = document.getElementById('logSearch').value.toLowerCase();
+    const action = document.getElementById('actionFilter').value.toLowerCase();
+    const status = document.getElementById('statusFilter').value.toLowerCase();
+    const rows   = document.querySelectorAll('#auditBody tr[data-action]');
+    let visible  = 0;
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const rowAction = row.dataset.action;
+        const rowStatus = row.dataset.status;
+
+        const matchSearch = !search || text.includes(search);
+        const matchAction = !action || rowAction === action;
+        const matchStatus = !status || rowStatus === status;
+
+        if (matchSearch && matchAction && matchStatus) {
+            row.style.display = '';
+            visible++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    document.getElementById('logCount').textContent = visible + ' events';
+}
+
+document.getElementById('logSearch').addEventListener('input', applyFilters);
+document.getElementById('actionFilter').addEventListener('change', applyFilters);
+document.getElementById('statusFilter').addEventListener('change', applyFilters);
+
+function exportLogs() {
+    alert('Exporting audit logs to CSV/JSON...');
+}
+
+// Audit Timeline Chart
+const auditCtx = document.getElementById('auditTimelineChart').getContext('2d');
+const auditGrad = auditCtx.createLinearGradient(0, 0, 0, 80);
+auditGrad.addColorStop(0, 'rgba(168,85,247,0.3)');
+auditGrad.addColorStop(1, 'rgba(168,85,247,0)');
+
+new Chart(auditCtx, {
+    type: 'line',
+    data: {
+        labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+        datasets: [{
+            label: 'Audit Events',
+            data: [5,3,2,1,2,4,8,15,22,18,25,20,
+                   18,22,28,25,20,15,12,10,8,6,5,4],
+            borderColor: '#a855f7',
+            backgroundColor: auditGrad,
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(10,14,26,0.9)',
+                titleColor: '#e2e8f0',
+                bodyColor: '#94a3b8',
+                borderColor: 'rgba(168,85,247,0.3)',
+                borderWidth: 1
+            }
+        },
+        scales: {
+            x: {
+                grid: { display: false },
+                ticks: { color: '#64748b', font: { size: 9 }, maxTicksLimit: 12 }
+            },
+            y: {
+                grid: { color: 'rgba(255,255,255,0.04)' },
+                ticks: { color: '#64748b', font: { size: 9 } },
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

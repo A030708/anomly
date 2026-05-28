@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - {{ platform_name }}{% endblock %}
+{% block page_title %}System Settings{% endblock %}
+{% block breadcrumb %}Settings{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .settings-section-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { font-size: 13px; color: var(--text-primary); }
+    .setting-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .toggle-switch { width: 42px; height: 24px; background: rgba(255,255,255,0.1); border-radius: 12px; position: relative; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+    .toggle-switch.active { background: #00d4ff; }
+    .toggle-switch::after { content: ''; width: 20px; height: 20px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: all 0.2s; }
+    .toggle-switch.active::after { left: 20px; }
+    .tabs-nav { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.07); flex-wrap: wrap; }
+    .tab-pill { padding: 9px 18px; background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
+    .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+    .tab-pill:hover { color: var(--text-primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .filter-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; outline: none; }
+    .filter-input:focus { border-color: #00d4ff; }
+    .filter-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+    .filter-select option { background: #1a2035; }
+    .danger-zone { border: 1px solid rgba(255,71,87,0.3); background: rgba(255,71,87,0.05); border-radius: 12px; padding: 20px; }
+    .session-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; }
+    .session-row:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tabs-nav">
+    <button class="tab-pill active" onclick="switchTab('general', this)"><i class="fas fa-gear"></i> General</button>
+    <button class="tab-pill" onclick="switchTab('notifications', this)"><i class="fas fa-bell"></i> Notifications</button>
+</div>
+
+<div class="tab-content active" id="tab-general">
+    <div class="settings-card">
+        <div class="settings-section-title">Platform Settings</div>
+        <div class="setting-row">
+            <div><div class="setting-label">Platform Name</div><div class="setting-desc">Display name for this Sentinel XDR instance</div></div>
+            <input class="filter-input" type="text" value="{{ settings.platform_name }}" style="width:200px;" onchange="saveSetting('platform_name', this.value)">
+        </div>
+        {% set timezones = ["UTC", "Asia/Kolkata", "America/New_York", "America/Chicago", "America/Los_Angeles", "Europe/London", "Asia/Dubai", "Asia/Singapore", "Australia/Sydney"] %}
+        {% set tz_labels = {"UTC": "UTC", "Asia/Kolkata": "India (IST) — UTC+5:30", "America/New_York": "America/New_York", "America/Chicago": "America/Chicago", "America/Los_Angeles": "America/Los_Angeles", "Europe/London": "Europe/London", "Asia/Dubai": "Asia/Dubai", "Asia/Singapore": "Asia/Singapore", "Australia/Sydney": "Australia/Sydney"} %}
+        <div class="setting-row">
+            <div><div class="setting-label">Time Zone</div><div class="setting-desc">Default time zone for all timestamps and reports</div></div>
+            <select class="filter-select" onchange="saveSetting('timezone', this.value)">
+                {% for tz in timezones %}<option value="{{ tz }}"{% if tz == selected_tz %} selected{% endif %}>{{ tz_labels[tz] }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="setting-row">
+            <div><div class="setting-label">Date Format</div><div class="setting-desc">Display format for dates throughout the platform</div></div>
+            <select class="filter-select" onchange="saveSetting('date_format', this.value)">
+                <option value="YYYY-MM-DD"{% if settings.date_format == 'YYYY-MM-DD' %} selected{% endif %}>YYYY-MM-DD</option>
+                <option value="MM/DD/YYYY"{% if settings.date_format == 'MM/DD/YYYY' %} selected{% endif %}>MM/DD/YYYY</option>
+                <option value="DD/MM/YYYY"{% if settings.date_format == 'DD/MM/YYYY' %} selected{% endif %}>DD/MM/YYYY</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <div><div class="setting-label">Retention Period</div><div class="setting-desc">How long to retain alert, event, and audit log data</div></div>
+            <select class="filter-select" onchange="saveSetting('retention_period', this.value)">
+                <option value="30 days"{% if settings.retention_period == '30 days' %} selected{% endif %}>30 days</option>
+                <option value="90 days"{% if settings.retention_period == '90 days' %} selected{% endif %}>90 days</option>
+                <option value="180 days"{% if settings.retention_period == '180 days' %} selected{% endif %}>180 days</option>
+                <option value="365 days"{% if settings.retention_period == '365 days' %} selected{% endif %}>365 days</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <div><div class="setting-label">Session Timeout</div><div class="setting-desc">Auto-logout after inactivity (minutes)</div></div>
+            <input class="filter-input" type="number" value="{{ settings.session_timeout }}" style="width:100px;" onchange="saveSetting('session_timeout', this.value)">
+        </div>
+        <div class="setting-row">
+            <div><div class="setting-label">Max Login Attempts</div><div class="setting-desc">Account lockout threshold</div></div>
+            <select class="filter-select" onchange="saveSetting('max_login_attempts', this.value)">
+                <option value="3"{% if settings.max_login_attempts == '3' %} selected{% endif %}>3</option>
+                <option value="5"{% if settings.max_login_attempts == '5' %} selected{% endif %}>5</option>
+                <option value="10"{% if settings.max_login_attempts == '10' %} selected{% endif %}>10</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <div><div class="setting-label">Password Policy</div><div class="setting-desc">Minimum password complexity requirements</div></div>
+            <select class="filter-select" onchange="saveSetting('password_policy', this.value)">
+                <option value="Standard"{% if settings.password_policy == 'Standard' %} selected{% endif %}>Standard</option>
+                <option value="Enhanced"{% if settings.password_policy == 'Enhanced' %} selected{% endif %}>Enhanced</option>
+                <option value="Strict"{% if settings.password_policy == 'Strict' %} selected{% endif %}>Strict</option>
+            </select>
+        </div>
+    </div>
+    <div class="settings-card">
+        <div class="settings-section-title">Data Collection</div>
+        <div class="setting-row">
+            <div><div class="setting-label">Event Collection</div><div class="setting-desc">Enable or disable event log ingestion from all sources</div></div>
+            <div class="toggle-switch{{ ' active' if settings.event_collection }}" onclick="toggleSetting('event_collection', this)"></div>
+        </div>
+        <div class="setting-row">
+            <div><div class="setting-label">Network Flow Collection</div><div class="setting-desc">Collect NetFlow/IPFIX data from monitored routers</div></div>
+            <div class="toggle-switch{{ ' active' if settings.network_flow_collection }}" onclick="toggleSetting('network_flow_collection', this)"></div>
+        </div>
+        <div class="setting-row">
+            <div><div class="setting-label">Endpoint Telemetry</div><div class="setting-desc">Collect EDR telemetry from deployed agents</div></div>
+            <div class="toggle-switch{{ ' active' if settings.endpoint_telemetry }}" onclick="toggleSetting('endpoint_telemetry', this)"></div>
+        </div>
+        <div class="setting-row">
+            <div><div class="setting-label">Threat Intelligence Feeds</div><div class="setting-desc">Auto-import external threat intel feeds (MISP, AlienVault, etc.)</div></div>
+            <div class="toggle-switch{{ ' active' if settings.threat_intel_feeds }}" onclick="toggleSetting('threat_intel_feeds', this)"></div>
+        </div>
+        <div class="setting-row">
+            <div><div class="setting-label">ML Anomaly Detection</div><div class="setting-desc">Enable ML-based anomaly detection on incoming events</div></div>
+            <div class="toggle-switch{{ ' active' if settings.ml_anomaly_detection }}" onclick="toggleSetting('ml_anomaly_detection', this)"></div>
+        </div>
+    </div>
+</div>
+
+<div class="tab-content" id="tab-integrations">
+    <div class="settings-card">
+        <div class="settings-section-title">Connected Services</div>
+        {% set services = [('Slack', 'fas fa-slack', '#4A154B', 'notifications@soc.xdr', 'Connected'),('PagerDuty', 'fas fa-bell', '#06AC38', 'xdr-alerts@pagerduty.com', 'Connected'),('Jira', 'fas fa-ticket', '#0052CC', 'https://company.atlassian.net', 'Connected'),('Splunk', 'fas fa-chart-simple', '#0093B5', 'https://splunk.company.com:8089', 'Disconnected'),('Microsoft Teams', 'fab fa-microsoft', '#6264A7', 'webhook://teams.soc', 'Connected')] %}
+        {% for name, icon, color, endpoint, status in services %}
+        <div class="setting-row">
+            <div class="d-flex align-items-center gap-3"><i class="{{ icon }}" style="color:{{ color }};width:20px;font-size:16px;"></i><div><div class="setting-label">{{ name }}</div><div style="font-size:10px;color:var(--text-muted);">{{ endpoint }}</div></div></div>
+            <span style="padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600;background:{% if status == 'Connected' %}rgba(0,255,136,0.15);color:#00ff88{% else %}rgba(100,116,139,0.15);color:#64748b{% endif %};">{{ status }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="tab-content" id="tab-notifications">
+    <div class="settings-card">
+        <div class="settings-section-title">Alert Notifications</div>
+        {% set notifs = [('critical_alerts', 'Critical Alerts', 'Real-time push for critical severity alerts'),('high_alerts', 'High Alerts', 'Push notification for high severity alerts'),('medium_alerts', 'Medium Alerts', 'Daily digest for medium severity alerts'),('low_alerts', 'Low Alerts', 'Weekly summary for low severity alerts'),('playbook_failures', 'Playbook Failures', 'Immediate notification when automation fails'),('new_user_onboarding', 'New User Onboarding', 'When new analysts join the platform'),('sla_breach', 'SLA Breach', 'Notification when case SLA is breached'),('system_health_alerts', 'System Health Alerts', 'Disk space, memory, service status changes')] %}
+        {% for key, name, desc in notifs %}
+        <div class="setting-row">
+            <div><div class="setting-label">{{ name }}</div><div class="setting-desc">{{ desc }}</div></div>
+            <div class="toggle-switch{{ ' active' if settings.get(key, True) }}" onclick="toggleSetting('{{ key }}', this)"></div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+
+function saveSetting(key, value) {
+    fetch('{{ url_for("settings.api_update_settings") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({[key]: value})
+    }).then(() => showToast('Setting saved')).catch(() => {});
+}
+
+function toggleSetting(key, el) {
+    el.classList.toggle('active');
+    saveSetting(key, el.classList.contains('active'));
+}
+
+function showToast(msg) {
+    let t = document.getElementById('settingsToast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'settingsToast';
+        t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#00ff88;color:#0a0e1a;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(t._hide);
+    t._hide = setTimeout(() => t.style.opacity = '0', 2000);
+}
+</script>
+{% endblock %}

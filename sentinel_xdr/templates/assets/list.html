@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block title %}Assets - {{ platform_name }}{% endblock %}
+{% block page_title %}Asset Management{% endblock %}
+{% block breadcrumb %}Assets{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-bar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+    }
+    .filter-input {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        outline: none;
+    }
+    .filter-input:focus { border-color: #00d4ff; }
+    .filter-input::placeholder { color: rgba(255,255,255,0.35); }
+    .filter-select {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        cursor: pointer;
+    }
+    .filter-select option { background: #1a2035; }
+    .asset-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        padding: 20px;
+        height: 100%;
+        transition: all 0.2s;
+        position: relative;
+        overflow: hidden;
+    }
+    .asset-card::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+    }
+    .asset-card.risk-critical::after { background: #ff4757; }
+    .asset-card.risk-high::after     { background: #ff6b35; }
+    .asset-card.risk-medium::after   { background: #ffd700; }
+    .asset-card.risk-low::after      { background: #00ff88; }
+    .asset-card:hover {
+        background: var(--bg-card-hover);
+        border-color: rgba(255,255,255,0.12);
+        transform: translateY(-2px);
+    }
+    .asset-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+    }
+    .asset-ip {
+        font-size: 11px;
+        font-family: monospace;
+        color: #00d4ff;
+        margin-bottom: 10px;
+    }
+    .asset-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        background: rgba(255,255,255,0.06);
+        border-radius: 4px;
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-right: 4px;
+        margin-bottom: 4px;
+    }
+    .risk-bar {
+        height: 4px;
+        background: rgba(255,255,255,0.07);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 10px;
+    }
+    .risk-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+    }
+    .view-toggle {
+        display: flex;
+        gap: 4px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 8px;
+        padding: 3px;
+    }
+    .toggle-btn {
+        padding: 5px 12px;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .toggle-btn.active {
+        background: rgba(0,212,255,0.15);
+        color: #00d4ff;
+    }
+    .os-badge {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+    .os-windows { background: rgba(0,212,255,0.1); color: #00d4ff; }
+    .os-linux   { background: rgba(255,215,0,0.1); color: #ffd700; }
+    .os-macos   { background: rgba(168,85,247,0.1); color: #a855f7; }
+    .pagination-wrap { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
+    .page-info { font-size: 12px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Row -->
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Total Assets',    stats.total,    '#e2e8f0',  'fas fa-server',           'rgba(255,255,255,0.05)'),
+        ('Critical Risk',   stats.critical, '#ff4757',  'fas fa-shield-exclamation','rgba(255,71,87,0.1)'),
+        ('High Risk',       stats.high,     '#ff6b35',  'fas fa-exclamation',       'rgba(255,107,53,0.1)'),
+        ('Online',          stats.online,   '#00ff88',  'fas fa-wifi',              'rgba(0,255,136,0.1)'),
+        ('Offline',         stats.offline,  '#94a3b8',  'fas fa-wifi-slash',        'rgba(100,116,139,0.1)'),
+        ('Unpatched',       stats.unpatched,'#ffd700',  'fas fa-clock',             'rgba(255,215,0,0.1)'),
+    ] %}
+    {% for label, value, color, icon, bg in kpis %}
+    <div class="col">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:22px;">{{ value }}</div>
+                </div>
+                <div class="stat-icon" style="background:{{ bg }};">
+                    <i class="{{ icon }}" style="color:{{ color }};"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <i class="fas fa-filter" style="color:var(--text-muted);"></i>
+    <input type="text" class="filter-input" id="searchInput"
+           placeholder="Search assets..." style="flex:1;min-width:200px;">
+    <select class="filter-select" id="typeFilter">
+        <option value="">All Types</option>
+        <option value="endpoint">Endpoint</option>
+        <option value="server">Server</option>
+        <option value="network">Network</option>
+        <option value="cloud">Cloud</option>
+        <option value="container">Container</option>
+    </select>
+    <select class="filter-select" id="statusFilter">
+        <option value="">All Statuses</option>
+        <option value="online">Online</option>
+        <option value="offline">Offline</option>
+        <option value="maintenance">Maintenance</option>
+        <option value="compromised">Compromised</option>
+    </select>
+    <select class="filter-select" id="riskFilter">
+        <option value="">All Risk</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+    </select>
+    <select class="filter-select" id="osFilter">
+        <option value="">All OS</option>
+        <option value="windows">Windows</option>
+        <option value="linux">Linux</option>
+        <option value="macos">macOS</option>
+    </select>
+    <div class="view-toggle">
+        <button class="toggle-btn active" id="gridViewBtn"
+                onclick="setView('grid')">
+            <i class="fas fa-th-large"></i>
+        </button>
+        <button class="toggle-btn" id="listViewBtn"
+                onclick="setView('list')">
+            <i class="fas fa-list"></i>
+        </button>
+    </div>
+    <a href="{{ url_for('assets.add_asset') }}" class="btn-primary-custom">
+        <i class="fas fa-plus"></i> Add Asset
+    </a>
+</div>
+
+<!-- GRID VIEW -->
+<div id="gridView">
+    <div class="row g-3">
+        {% if assets %}
+            {% for asset in assets %}
+            <div class="col-md-6 col-lg-4 asset-grid-item"
+                 data-type="{{ asset.asset_type|lower }}"
+                 data-status="{{ asset.status|lower }}"
+                 data-risk="{{ asset.risk_level|lower }}"
+                 data-os="{{ asset.os|lower }}">
+                <a href="{{ url_for('assets.asset_detail', asset_id=asset.id) }}"
+                   style="text-decoration:none;display:block;height:100%;">
+                    <div class="asset-card risk-{{ asset.risk_level|lower }}">
+                        <div class="d-flex align-items-start gap-3">
+                            <div style="width:40px;height:40px;border-radius:10px;
+                                        background:{{ 'rgba(0,212,255,0.1)' if asset.asset_type == 'endpoint' else 'rgba(168,85,247,0.1)' if asset.asset_type == 'server' else 'rgba(255,215,0,0.1)' }};
+                                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-{{ 'laptop' if asset.asset_type == 'endpoint' else 'server' if asset.asset_type == 'server' else 'network-wired' if asset.asset_type == 'network' else 'cloud' }}"
+                                   style="color:{{ '#00d4ff' if asset.asset_type == 'endpoint' else '#a855f7' if asset.asset_type == 'server' else '#ffd700' }};font-size:16px;"></i>
+                            </div>
+                            <div style="flex:1;min-width:0;">
+                                <div class="asset-name">{{ asset.hostname }}</div>
+                                <div class="asset-ip">{{ asset.ip_address }}</div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            <span class="os-badge os-{{ asset.os|lower }}">{{ asset.os }}</span>
+                            {% if asset.department %}
+                            <span class="asset-tag">{{ asset.department }}</span>
+                            {% endif %}
+                            {% if asset.location %}
+                            <span class="asset-tag">{{ asset.location }}</span>
+                            {% endif %}
+                            <span class="asset-tag">{{ asset.asset_type }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="status-badge status-{{ asset.status|lower }}">
+                                    {{ asset.status }}
+                                </span>
+                                <span class="severity-badge severity-{{ asset.risk_level|lower }} ms-1">
+                                    {{ asset.risk_level }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="risk-bar">
+                            <div class="risk-bar-fill"
+                                 style="width:{{ asset.risk_score or 0 }}%;
+                                        background:{{ '#ff4757' if asset.risk_level == 'critical' else '#ff6b35' if asset.risk_level == 'high' else '#ffd700' if asset.risk_level == 'medium' else '#00ff88' }};">
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <i class="fas fa-server"></i>
+                            <p>No assets found</p>
+                            <a href="{{ url_for('assets.add_asset') }}" class="btn-primary-custom mt-2">
+                                <i class="fas fa-plus"></i> Add First Asset
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- LIST VIEW -->
+<div id="listView" style="display:none;">
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-server" style="color:#00d4ff;"></i>
+            <span class="card-title">Assets</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Hostname</th>
+                        <th>IP Address</th>
+                        <th>Type</th>
+                        <th>OS</th>
+                        <th>Status</th>
+                        <th>Risk</th>
+                        <th>Score</th>
+                        <th>Last Seen</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if assets %}
+                        {% for asset in assets %}
+                        <tr data-type="{{ asset.asset_type|lower }}"
+                            data-status="{{ asset.status|lower }}"
+                            data-risk="{{ asset.risk_level|lower }}"
+                            data-os="{{ asset.os|lower }}">
+                            <td>
+                                <div style="font-size:13px;font-weight:500;">{{ asset.hostname }}</div>
+                                <div style="font-size:10px;color:var(--text-muted);">{{ asset.domain or '' }}</div>
+                            </td>
+                            <td style="font-size:12px;font-family:monospace;color:#00d4ff;">
+                                {{ asset.ip_address }}
+                            </td>
+                            <td style="font-size:12px;color:var(--text-secondary);">{{ asset.asset_type }}</td>
+                            <td><span class="os-badge os-{{ asset.os|lower }}">{{ asset.os }}</span></td>
+                            <td>
+                                <span class="status-badge status-{{ asset.status|lower }}">
+                                    {{ asset.status }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="severity-badge severity-{{ asset.risk_level|lower }}">
+                                    {{ asset.risk_level }}
+                                </span>
+                            </td>
+                            <td>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <div style="width:50px;height:4px;background:rgba(255,255,255,0.07);
+                                                border-radius:2px;overflow:hidden;">
+                                        <div style="width:{{ asset.risk_score or 0 }}%;height:100%;
+                                                    background:{{ '#ff4757' if asset.risk_level=='critical' else '#ff6b35' if asset.risk_level=='high' else '#ffd700' if asset.risk_level=='medium' else '#00ff88' }};
+                                                    border-radius:2px;"></div>
+                                    </div>
+                                    <span style="font-size:11px;color:var(--text-muted);">
+                                        {{ asset.risk_score or 0 }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td style="font-size:11px;color:var(--text-muted);white-space:nowrap;">
+                                {{ asset.last_seen.strftime('%Y-%m-%d %H:%M') if asset.last_seen else 'N/A' }}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('assets.asset_detail', asset_id=asset.id) }}"
+                                   style="padding:5px 10px;background:rgba(0,212,255,0.1);
+                                          border:1px solid rgba(0,212,255,0.2);color:#00d4ff;
+                                          border-radius:6px;font-size:11px;text-decoration:none;">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr><td colspan="9">
+                            <div class="empty-state">
+                                <i class="fas fa-server"></i>
+                                <p>No assets found</p>
+                            </div>
+                        </td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function setView(view) {
+    const gridView  = document.getElementById('gridView');
+    const listView  = document.getElementById('listView');
+    const gridBtn   = document.getElementById('gridViewBtn');
+    const listBtn   = document.getElementById('listViewBtn');
+
+    if (view === 'grid') {
+        gridView.style.display  = '';
+        listView.style.display  = 'none';
+        gridBtn.classList.add('active');
+        listBtn.classList.remove('active');
+    } else {
+        gridView.style.display  = 'none';
+        listView.style.display  = '';
+        listBtn.classList.add('active');
+        gridBtn.classList.remove('active');
+    }
+    localStorage.setItem('assetView', view);
+}
+
+const savedView = localStorage.getItem('assetView');
+if (savedView) setView(savedView);
+
+function applyFilters() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const type   = document.getElementById('typeFilter').value.toLowerCase();
+    const status = document.getElementById('statusFilter').value.toLowerCase();
+    const risk   = document.getElementById('riskFilter').value.toLowerCase();
+    const os     = document.getElementById('osFilter').value.toLowerCase();
+
+    document.querySelectorAll('.asset-grid-item').forEach(item => {
+        const text = item.textContent.toLowerCase();
+        const matchSearch = !search || text.includes(search);
+        const matchType   = !type   || item.dataset.type === type;
+        const matchStatus = !status || item.dataset.status === status;
+        const matchRisk   = !risk   || item.dataset.risk === risk;
+        const matchOs     = !os     || item.dataset.os === os;
+        item.style.display = (matchSearch && matchType && matchStatus && matchRisk && matchOs) ? '' : 'none';
+    });
+}
+
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+document.getElementById('typeFilter').addEventListener('change', applyFilters);
+document.getElementById('statusFilter').addEventListener('change', applyFilters);
+document.getElementById('riskFilter').addEventListener('change', applyFilters);
+document.getElementById('osFilter').addEventListener('change', applyFilters);
+</script>
+{% endblock %}

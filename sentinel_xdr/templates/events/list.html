@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Events - {{ platform_name }}{% endblock %}
+{% block page_title %}Event Log{% endblock %}
+{% block breadcrumb %}Events{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-bar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+    }
+    .filter-input {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        outline: none;
+    }
+    .filter-input:focus { border-color: #00d4ff; }
+    .filter-input::placeholder { color: rgba(255,255,255,0.35); }
+    .filter-select {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        cursor: pointer;
+    }
+    .filter-select option { background: #1a2035; }
+    .live-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        background: rgba(0,255,136,0.08);
+        border: 1px solid rgba(0,255,136,0.15);
+        border-radius: 20px;
+        font-size: 11px;
+        color: #00ff88;
+    }
+    .live-dot {
+        width: 7px; height: 7px;
+        background: #00ff88;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+    .raw-log-expand {
+        display: none;
+        background: rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 6px;
+        padding: 12px;
+        font-family: monospace;
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-top: 6px;
+        max-height: 200px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+    .raw-log-expand.show { display: block; }
+    .toggle-raw {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 11px;
+        cursor: pointer;
+        padding: 0;
+    }
+    .toggle-raw:hover { color: #00d4ff; }
+    .event-type-badge {
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+    .type-authentication { background: rgba(0,212,255,0.1); color: #00d4ff; }
+    .type-network { background: rgba(168,85,247,0.1); color: #a855f7; }
+    .type-file { background: rgba(255,215,0,0.1); color: #ffd700; }
+    .type-process { background: rgba(255,107,53,0.1); color: #ff6b35; }
+    .type-system { background: rgba(100,116,139,0.15); color: #94a3b8; }
+    .type-registry { background: rgba(255,71,87,0.1); color: #ff4757; }
+    .pagination-wrap { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
+    .page-info { font-size: 12px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Row -->
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Total Events', stats.total, '#e2e8f0', 'fas fa-list', 'rgba(255,255,255,0.05)'),
+        ('Last Hour', stats.last_hour, '#00d4ff', 'fas fa-clock', 'rgba(0,212,255,0.1)'),
+        ('Last 24h', stats.last_24h, '#00ff88', 'fas fa-calendar-day', 'rgba(0,255,136,0.1)'),
+        ('Avg Rate/h', stats.avg_rate, '#a855f7', 'fas fa-chart-line', 'rgba(168,85,247,0.1)'),
+        ('Distinct Sources', stats.distinct_sources, '#ffd700', 'fas fa-server', 'rgba(255,215,0,0.1)'),
+        ('Anomalies', stats.anomalies, '#ff4757', 'fas fa-exclamation-triangle', 'rgba(255,71,87,0.1)'),
+    ] %}
+    {% for label, value, color, icon, bg in kpis %}
+    <div class="col">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:22px;">{{ value }}</div>
+                </div>
+                <div class="stat-icon" style="background:{{ bg }};">
+                    <i class="{{ icon }}" style="color:{{ color }};"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <i class="fas fa-filter" style="color:var(--text-muted);"></i>
+    <input type="text" class="filter-input" id="searchInput"
+           placeholder="Search events..." style="flex:1;min-width:200px;">
+    <select class="filter-select" id="typeFilter">
+        <option value="">All Types</option>
+        <option value="authentication">Authentication</option>
+        <option value="network">Network</option>
+        <option value="file">File</option>
+        <option value="process">Process</option>
+        <option value="system">System</option>
+        <option value="registry">Registry</option>
+    </select>
+    <select class="filter-select" id="sourceFilter">
+        <option value="">All Sources</option>
+        <option value="sentinel">Sentinel</option>
+        <option value="boltmart">BoltMart</option>
+        <option value="warehouseos">WarehouseOS</option>
+        <option value="firewall">Firewall</option>
+        <option value="endpoint">Endpoint</option>
+    </select>
+    <select class="filter-select" id="timeFilter">
+        <option value="">All Time</option>
+        <option value="1h">Last Hour</option>
+        <option value="6h">Last 6 Hours</option>
+        <option value="24h">Last 24 Hours</option>
+        <option value="7d">Last 7 Days</option>
+        <option value="30d">Last 30 Days</option>
+    </select>
+    <div class="d-flex gap-2 ms-auto">
+        <div class="live-indicator">
+            <div class="live-dot"></div>
+            <span>Live</span>
+        </div>
+        <button class="btn-primary-custom" style="padding:6px 14px;font-size:12px;" onclick="exportEvents()">
+            <i class="fas fa-download"></i> Export
+        </button>
+        <button class="btn-primary-custom" style="padding:6px 14px;font-size:12px;" onclick="refreshEvents()">
+            <i class="fas fa-rotate"></i> Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Events Table -->
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-list-ul" style="color:#00d4ff;"></i>
+        <span class="card-title">Event Log</span>
+        <span style="font-size:12px;color:var(--text-muted);">
+            {{ pagination.total if pagination else events|length }} events
+        </span>
+    </div>
+    <div class="table-responsive">
+        <table class="table" id="eventsTable">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Type</th>
+                    <th>Source</th>
+                    <th>Description</th>
+                    <th>User</th>
+                    <th>Source IP</th>
+                    <th>Raw Log</th>
+                </tr>
+            </thead>
+            <tbody id="eventsBody">
+                {% if events %}
+                    {% for event in events %}
+                    <tr data-type="{{ event.event_type|lower }}"
+                        data-source="{{ event.source|lower }}">
+                        <td class="local-time" data-utc="{{ event.created_at.isoformat() if event.created_at else '' }}" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">
+                            {{ event.created_at.strftime('%Y-%m-%d %H:%M:%S') if event.created_at else 'N/A' }}
+                        </td>
+                        <td>
+                            <span class="event-type-badge type-{{ event.event_type|lower }}">
+                                {{ event.event_type }}
+                            </span>
+                        </td>
+                        <td style="font-size:12px;color:var(--text-secondary);">{{ event.source }}</td>
+                        <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            {{ event.description or '—' }}
+                        </td>
+                        <td style="font-size:12px;color:var(--text-secondary);">{{ event.username or 'SYSTEM' }}</td>
+                        <td style="font-size:12px;font-family:monospace;color:#00d4ff;">
+                            {{ event.source_ip or '—' }}
+                        </td>
+                        <td>
+                            {% if event.raw_log %}
+                            <button class="toggle-raw" onclick="toggleRaw(this)">
+                                <i class="fas fa-code"></i> View
+                            </button>
+                            <div class="raw-log-expand">{{ event.raw_log }}</div>
+                            {% else %}
+                            <span style="font-size:11px;color:var(--text-muted);">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="fas fa-list-ul"></i>
+                                <p>No events found</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Pagination -->
+    <div class="pagination-wrap border-top" style="border-color:rgba(255,255,255,0.06)!important;">
+        <div class="page-info">
+            Showing page {{ pagination.page or 1 }} of {{ pagination.pages or 1 }}
+        </div>
+        <div class="d-flex gap-2">
+            {% if pagination and pagination.has_prev %}
+            <a href="?page={{ pagination.prev_num }}"
+               style="padding:6px 14px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);
+                      color:#00d4ff;border-radius:6px;font-size:12px;text-decoration:none;">
+                <i class="fas fa-chevron-left"></i> Prev
+            </a>
+            {% endif %}
+            {% if pagination and pagination.has_next %}
+            <a href="?page={{ pagination.next_num }}"
+               style="padding:6px 14px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);
+                      color:#00d4ff;border-radius:6px;font-size:12px;text-decoration:none;">
+                Next <i class="fas fa-chevron-right"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleRaw(btn) {
+    const raw = btn.nextElementSibling;
+    raw.classList.toggle('show');
+    btn.innerHTML = raw.classList.contains('show')
+        ? '<i class="fas fa-eye-slash"></i> Hide'
+        : '<i class="fas fa-code"></i> View';
+}
+
+function applyFilters() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const type = document.getElementById('typeFilter').value.toLowerCase();
+    const source = document.getElementById('sourceFilter').value.toLowerCase();
+    const rows = document.querySelectorAll('#eventsBody tr[data-type]');
+    let visible = 0;
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const matchSearch = !search || text.includes(search);
+        const matchType = !type || row.dataset.type === type;
+        const matchSource = !source || row.dataset.source === source;
+
+        if (matchSearch && matchType && matchSource) {
+            row.style.display = '';
+            visible++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+document.getElementById('typeFilter').addEventListener('change', applyFilters);
+document.getElementById('sourceFilter').addEventListener('change', applyFilters);
+
+function exportEvents() {
+    alert('Export events to CSV/JSON - implement server-side');
+}
+
+function refreshEvents() {
+    location.reload();
+}
+
+// Auto-refresh polling placeholder
+setTimeout(() => {
+    // Future: fetch new events via SSE or polling
+}, 30000);
+</script>
+{% endblock %}

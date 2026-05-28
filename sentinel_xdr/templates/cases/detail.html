@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{{ case.title }} - {{ platform_name }}{% endblock %}
+{% block page_title %}{{ case.title }}{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('cases.list_cases') }}" style="color:#00d4ff;text-decoration:none;">Cases</a> / {{ case.title[:30] }}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-folder-open" style="color:#ffd700;"></i>
+                <span class="card-title">Case #{{ case.id }}</span>
+                <span class="severity-badge severity-{{ case.priority|lower }}">{{ case.priority }}</span>
+                <span class="status-badge status-{{ case.status|lower }}">{{ case.status }}</span>
+            </div>
+            <div class="card-body">
+                <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;">{{ case.description or 'No description.' }}</p>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:16px;">
+                    {% set fields = [('Assigned To', case.assigned_to or 'Unassigned'), ('Priority', case.priority or 'Medium'), ('Due Date', case.due_date.strftime('%Y-%m-%d') if case.due_date else 'Not set'), ('Alerts', case.alert_count|string), ('Incidents', case.incident_count|string), ('Created', case.created_at.strftime('%Y-%m-%d') if case.created_at else 'N/A'), ('Last Updated', case.updated_at.strftime('%Y-%m-%d') if case.updated_at else 'N/A'), ('Status', case.status)] %}
+                    {% for label, value in fields %}
+                    <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:10px;"><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">{{ label }}</div><div style="font-size:12px;font-weight:500;">{{ value }}</div></div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><i class="fas fa-list" style="color:#00d4ff;"></i><span class="card-title">Linked Alerts</span></div>
+            <div class="table-responsive">
+                <table class="table"><thead><tr><th>Alert</th><th>Severity</th><th>Source</th><th>Time</th></tr></thead>
+                <tbody>{% if linked_alerts %}{% for a in linked_alerts %}<tr onclick="window.location='{{ url_for('alerts.alert_detail', alert_id=a.id) }}'" style="cursor:pointer;"><td><div style="font-size:13px;">{{ a.title[:45] }}{% if a.title|length > 45 %}...{% endif %}</div></td><td><span class="severity-badge severity-{{ a.severity|lower }}">{{ a.severity }}</span></td><td style="font-family:monospace;font-size:12px;color:#00d4ff;">{{ a.source_ip or '—' }}</td><td style="font-size:11px;color:var(--text-muted);">{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else 'N/A' }}</td></tr>{% endfor %}{% else %}<tr><td colspan="4"><div class="empty-state"><i class="fas fa-bell-slash"></i><p>No linked alerts</p></div></td></tr>{% endif %}</tbody></table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header"><i class="fas fa-bolt" style="color:#ffd700;"></i><span class="card-title">Actions</span></div>
+            <div class="card-body d-grid gap-2">
+                <a href="{{ url_for('cases.edit_case', case_id=case.id) }}" class="btn-primary-custom justify-content-center"><i class="fas fa-pen"></i> Edit Case</a>
+                {% if case.status != 'closed' %}<a href="{{ url_for('cases.close_case', case_id=case.id) }}" class="btn-primary-custom justify-content-center" style="background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.2);color:#00ff88;"><i class="fas fa-check"></i> Close Case</a>{% endif %}
+                <a href="{{ url_for('reports.generate_report') }}?case={{ case.id }}" class="btn-primary-custom justify-content-center" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);"><i class="fas fa-file-pdf"></i> Generate Report</a>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><i class="fas fa-user" style="color:#00d4ff;"></i><span class="card-title">Activity</span></div>
+            <div class="card-body" style="padding:12px;">
+                {% if activities %}{% for act in activities %}<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;color:var(--text-secondary);"><span style="color:var(--text-muted);">{{ act.timestamp.strftime('%H:%M') if act.timestamp else '' }}</span> {{ act.description }}</div>{% endfor %}{% else %}<div class="empty-state" style="padding:16px;"><i class="fas fa-clock"></i><p style="font-size:12px;">No activity recorded</p></div>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

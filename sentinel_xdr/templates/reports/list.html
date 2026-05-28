@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - {{ platform_name }}{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block breadcrumb %}Reports{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 18px 20px;
+        transition: all 0.2s;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+    .report-card:hover {
+        background: var(--bg-card-hover);
+        border-color: rgba(0,212,255,0.2);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    }
+    .report-icon {
+        width: 48px; height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        margin-bottom: 14px;
+    }
+    .report-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+    }
+    .report-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.5;
+        margin-bottom: 12px;
+    }
+    .report-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+    .report-meta span { display: flex; align-items: center; gap: 4px; }
+    .schedule-badge {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+    .schedule-daily   { background:rgba(0,212,255,0.12); color:#00d4ff; }
+    .schedule-weekly  { background:rgba(0,255,136,0.12); color:#00ff88; }
+    .schedule-monthly { background:rgba(168,85,247,0.12);color:#a855f7; }
+    .schedule-manual  { background:rgba(100,116,139,0.15);color:#64748b;}
+    .tabs-nav {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .tab-pill {
+        padding: 9px 18px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-size: 13px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: all 0.2s;
+    }
+    .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+    .tab-pill:hover  { color: var(--text-primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .generate-btn {
+        width: 100%;
+        padding: 8px;
+        background: linear-gradient(135deg,rgba(0,212,255,0.1),rgba(0,102,255,0.08));
+        border: 1px solid rgba(0,212,255,0.2);
+        color: #00d4ff;
+        border-radius: 8px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+    .generate-btn:hover {
+        background: linear-gradient(135deg,rgba(0,212,255,0.2),rgba(0,102,255,0.15));
+    }
+    .report-history-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .report-history-item:last-child { border-bottom: none; }
+    .file-icon {
+        width: 36px; height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+    .metric-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 10px;
+        padding: 14px 16px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Row -->
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Reports Generated', stats.generated,  '#00d4ff', 'fas fa-file-chart-column'),
+        ('Scheduled Reports', stats.scheduled,  '#00ff88', 'fas fa-calendar-check'),
+        ('This Month',        stats.this_month, '#a855f7', 'fas fa-chart-bar'),
+        ('Pending',           stats.pending,    '#ffd700', 'fas fa-hourglass-half'),
+    ] %}
+    {% for label, value, color, icon in kpis %}
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:26px;">{{ value }}</div>
+                </div>
+                <i class="{{ icon }}" style="color:{{ color }};font-size:28px;opacity:0.5;"></i>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Tabs -->
+<div class="tabs-nav">
+    <button class="tab-pill active" onclick="switchTab('templates', this)"><i class="fas fa-file-alt me-1"></i> Report Templates</button>
+    <button class="tab-pill" onclick="switchTab('history', this)"><i class="fas fa-history me-1"></i> Generated Reports</button>
+    <button class="tab-pill" onclick="switchTab('scheduled', this)"><i class="fas fa-calendar me-1"></i> Scheduled</button>
+    <button class="tab-pill" onclick="switchTab('analytics', this)"><i class="fas fa-chart-line me-1"></i> Analytics</button>
+</div>
+
+<!-- ── TAB: Templates ── -->
+<div class="tab-content active" id="tab-templates">
+    <div class="row g-3">
+        {% set report_templates = [
+            ('Executive Summary',       'fas fa-chart-pie',     'rgba(0,212,255,0.1)', '#00d4ff',
+             'High-level security posture overview for C-suite stakeholders.',             'Weekly', 'PDF', True),
+            ('Incident Report',         'fas fa-fire',          'rgba(255,71,87,0.1)',  '#ff4757',
+             'Detailed incident timeline, impact analysis, and remediation steps.',        'Manual',  'PDF/DOCX', True),
+            ('Threat Intelligence',     'fas fa-crosshairs',    'rgba(168,85,247,0.1)','#a855f7',
+             'IOC trends, threat actor activity, and emerging threat landscape.',          'Weekly', 'PDF', True),
+            ('Vulnerability Report',    'fas fa-bug',           'rgba(255,215,0,0.1)', '#ffd700',
+             'Current vulnerability posture, CVSS scores, and patch prioritization.',      'Monthly', 'PDF/CSV', True),
+            ('Compliance Report',       'fas fa-shield-check',  'rgba(0,255,136,0.1)', '#00ff88',
+             'Compliance status against frameworks: ISO 27001, SOC2, PCI-DSS, HIPAA.',    'Monthly', 'PDF', False),
+            ('SOC Metrics',             'fas fa-gauge-high',    'rgba(0,212,255,0.1)', '#00d4ff',
+             'MTTD, MTTR, alert volume, analyst performance and SLA metrics.',             'Daily',   'PDF/CSV', True),
+            ('Forensics Report',        'fas fa-microscope',    'rgba(255,107,53,0.1)','#ff6b35',
+             'Digital forensics findings, chain of custody, and evidence analysis.',        'Manual',  'PDF',     False),
+            ('Threat Hunting Report',   'fas fa-magnifying-glass-chart','rgba(255,215,0,0.1)','#ffd700',
+             'Hunt hypotheses, queries executed, findings and recommendations.',            'Monthly', 'PDF',     True),
+            ('Asset Risk Report',       'fas fa-server',        'rgba(168,85,247,0.1)','#a855f7',
+             'Asset risk scores, exposure analysis, and security recommendations.',         'Monthly', 'PDF/CSV', True),
+        ] %}
+        {% for name, icon, bg, color, desc, schedule, formats, available in report_templates %}
+        <div class="col-xl-4 col-lg-6">
+            <div class="report-card">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="report-icon" style="background:{{ bg }};"><i class="{{ icon }}" style="color:{{ color }};"></i></div>
+                    <span class="schedule-badge schedule-{{ schedule|lower }}">{{ schedule }}</span>
+                </div>
+                <div class="report-title">{{ name }}</div>
+                <div class="report-desc">{{ desc }}</div>
+                <div class="report-meta">
+                    <span><i class="fas fa-file"></i> {{ formats }}</span>
+                    <span><i class="fas fa-calendar"></i> {{ schedule }}</span>
+                    {% if not available %}<span style="color:#ff4757;"><i class="fas fa-lock"></i> Pro Feature</span>{% endif %}
+                </div>
+                <div class="d-flex gap-2">
+                    {% if available %}
+                    <button onclick="generateReport('{{ name }}')" class="generate-btn" style="flex:1;"><i class="fas fa-download"></i> Generate</button>
+                    <button onclick="scheduleReport('{{ name }}')" style="padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-muted);border-radius:8px;font-size:12px;cursor:pointer;"><i class="fas fa-calendar-plus"></i></button>
+                    {% else %}
+                    <button disabled style="flex:1;padding:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);color:var(--text-muted);border-radius:8px;font-size:12px;cursor:not-allowed;"><i class="fas fa-lock me-1"></i> Upgrade Required</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- ── TAB: History ── -->
+<div class="tab-content" id="tab-history">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header"><i class="fas fa-history" style="color:#00d4ff;"></i><span class="card-title">Generated Reports</span><div class="ms-auto d-flex gap-2"><input type="text" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;border-radius:6px;padding:6px 12px;font-size:12px;outline:none;" placeholder="Search reports..."></div></div>
+                <div class="card-body" style="padding:16px;">
+                    {% set report_history = [
+                        ('Executive Summary - Jan 2024',      'pdf',  '2.4 MB',  '2024-01-15', 'analyst1', 'Weekly'),
+                        ('Incident Report #1042',              'pdf',  '1.8 MB',  '2024-01-14', 'analyst2', 'Manual'),
+                        ('Vulnerability Report - Q4 2023',    'pdf',  '4.2 MB',  '2024-01-12', 'auto',     'Monthly'),
+                        ('SOC Metrics Dashboard',              'pdf',  '1.1 MB',  '2024-01-12', 'auto',     'Daily'),
+                        ('Threat Intelligence Brief',          'pdf',  '3.5 MB',  '2024-01-08', 'auto',     'Weekly'),
+                        ('Asset Risk Assessment',              'csv',  '845 KB',  '2024-01-07', 'analyst1', 'Monthly'),
+                        ('Compliance Status - SOC2',           'pdf',  '6.8 MB',  '2024-01-05', 'analyst3', 'Monthly'),
+                        ('Forensics Report - Case #3',         'pdf',  '12.4 MB', '2024-01-03', 'analyst2', 'Manual'),
+                    ] %}
+                    {% for name, fmt, size, date, author, schedule in report_history %}
+                    <div class="report-history-item">
+                        <div class="file-icon" style="background:{{ 'rgba(255,71,87,0.1)' if fmt=='pdf' else 'rgba(0,255,136,0.1)' }};"><i class="fas fa-file-{{ fmt }}" style="color:{{ '#ff4757' if fmt=='pdf' else '#00ff88' }};font-size:15px;"></i></div>
+                        <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ name }}</div><div style="font-size:11px;color:var(--text-muted);">{{ fmt.upper() }} &middot; {{ size }} &middot; {{ author }} &middot; {{ schedule }}</div></div>
+                        <div style="font-size:11px;color:var(--text-muted);flex-shrink:0;margin-right:10px;">{{ date }}</div>
+                        <div class="d-flex gap-1 flex-shrink-0">
+                            <button style="padding:5px 9px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;border-radius:5px;font-size:11px;cursor:pointer;" title="Download"><i class="fas fa-download"></i></button>
+                            <button style="padding:5px 9px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-muted);border-radius:5px;font-size:11px;cursor:pointer;" title="Share"><i class="fas fa-share"></i></button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-hdd" style="color:#00d4ff;"></i><span class="card-title">Storage</span></div>
+                <div class="card-body">
+                    <div style="text-align:center;margin-bottom:16px;"><div style="font-size:28px;font-weight:700;color:#00d4ff;">3.2 GB</div><div style="font-size:11px;color:var(--text-muted);">of 10 GB used</div></div>
+                    <div style="height:8px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;margin-bottom:12px;"><div style="width:32%;height:100%;background:linear-gradient(90deg,#00d4ff,#00ff88);border-radius:4px;"></div></div>
+                    {% set file_types = [('PDF Reports', '2.1 GB', '#ff4757', 66),('CSV Exports', '0.6 GB', '#00ff88', 19),('DOCX Reports', '0.5 GB', '#ffd700', 15)] %}
+                    {% for label, size, color, pct in file_types %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2"><div style="width:8px;height:8px;border-radius:2px;background:{{ color }};flex-shrink:0;"></div><span style="font-size:12px;color:var(--text-secondary);">{{ label }}</span></div>
+                        <div style="font-size:12px;color:{{ color }};font-weight:600;">{{ size }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header"><i class="fas fa-chart-bar" style="color:#a855f7;"></i><span class="card-title">Report Activity</span></div>
+                <div class="card-body"><canvas id="reportActivityChart" height="160"></canvas></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB: Scheduled ── -->
+<div class="tab-content" id="tab-scheduled">
+    <div class="card">
+        <div class="card-header"><i class="fas fa-calendar-check" style="color:#00ff88;"></i><span class="card-title">Scheduled Reports</span><button class="btn-primary-custom ms-auto" style="font-size:12px;padding:6px 14px;" onclick="alert('Add new schedule')"><i class="fas fa-plus"></i> Add Schedule</button></div>
+        <div class="table-responsive">
+            <table class="table"><thead><tr><th>Report Name</th><th>Frequency</th><th>Format</th><th>Recipients</th><th>Next Run</th><th>Last Run</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% set schedules = [
+                    ('Executive Summary',     'Weekly (Mon)',   'PDF',     'ciso@company.com, cto@company.com',    '2024-01-22', '2024-01-15', True),
+                    ('SOC Daily Metrics',     'Daily (06:00)',  'PDF',     'soc-team@company.com',                '2024-01-16', '2024-01-15', True),
+                    ('Vulnerability Report',  'Monthly (1st)',  'PDF/CSV', 'it-manager@company.com',              '2024-02-01', '2024-01-01', True),
+                    ('Threat Intel Brief',    'Weekly (Fri)',   'PDF',     'security-team@company.com',           '2024-01-19', '2024-01-12', True),
+                    ('Compliance Report',     'Monthly (1st)',  'PDF',     'compliance@company.com',              '2024-02-01', '2024-01-01', False),
+                    ('Asset Risk Report',     'Monthly (15th)', 'CSV',     'it-manager@company.com',              '2024-01-15', '2023-12-15', True),
+                ] %}
+                {% for name, freq, fmt, recipients, next_run, last_run, active in schedules %}
+                <tr>
+                    <td style="font-size:13px;font-weight:500;">{{ name }}</td>
+                    <td><span class="schedule-badge schedule-{{ freq.split()[0]|lower }}">{{ freq }}</span></td>
+                    <td style="font-size:12px;color:var(--text-secondary);">{{ fmt }}</td>
+                    <td style="font-size:11px;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ recipients }}</td>
+                    <td style="font-size:11px;color:var(--text-secondary);">{{ next_run }}</td>
+                    <td style="font-size:11px;color:var(--text-muted);">{{ last_run }}</td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div style="width:7px;height:7px;border-radius:50%;background:{{ '#00ff88' if active else '#ff4757' }};"></div>
+                            <span style="font-size:11px;color:{{ '#00ff88' if active else '#ff4757' }};">{{ 'Active' if active else 'Paused' }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button style="padding:4px 8px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;border-radius:5px;font-size:10px;cursor:pointer;"><i class="fas fa-edit"></i></button>
+                            <button style="padding:4px 8px;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.2);color:#ffd700;border-radius:5px;font-size:10px;cursor:pointer;"><i class="fas fa-{{ 'pause' if active else 'play' }}"></i></button>
+                            <button style="padding:4px 8px;background:rgba(255,71,87,0.1);border:1px solid rgba(255,71,87,0.2);color:#ff4757;border-radius:5px;font-size:10px;cursor:pointer;"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody></table>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB: Analytics ── -->
+<div class="tab-content" id="tab-analytics">
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header"><i class="fas fa-chart-line" style="color:#00d4ff;"></i><span class="card-title">Security Metrics Trend (30 Days)</span><div class="ms-auto"><select style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;border-radius:6px;padding:5px 10px;font-size:11px;"><option>Last 30 Days</option><option>Last 90 Days</option><option>Last Year</option></select></div></div>
+                <div class="card-body"><canvas id="securityTrendChart" height="220"></canvas></div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header"><i class="fas fa-gauge-high" style="color:#ffd700;"></i><span class="card-title">Key SOC Metrics</span></div>
+                <div class="card-body">
+                    {% set metrics = [('MTTD', '4.2h', '#ff6b35', 'Mean Time to Detect'),('MTTR', '8.7h', '#ffd700', 'Mean Time to Respond'),('Alert Volume', '1,247', '#00d4ff', 'Total alerts this month'),('False Pos. Rate','18%', '#a855f7', 'False positive percentage'),('SLA Adherence','94%', '#00ff88', 'SLA compliance rate'),('Analyst Score','8.6', '#00d4ff', 'Avg analyst performance')] %}
+                    {% for label, value, color, tooltip in metrics %}
+                    <div class="metric-card mb-2" title="{{ tooltip }}"><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">{{ label }}</div><div style="font-size:20px;font-weight:700;color:{{ color }};">{{ value }}</div></div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card"><div class="card-header"><i class="fas fa-chart-pie" style="color:#a855f7;"></i><span class="card-title">Alert Distribution</span></div><div class="card-body"><canvas id="alertDistChart" height="200"></canvas></div></div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card"><div class="card-header"><i class="fas fa-users" style="color:#00d4ff;"></i><span class="card-title">Analyst Performance</span></div><div class="card-body">
+                {% set analysts = [('analyst1', 98, 94, '#00ff88'),('analyst2', 87, 88, '#00d4ff'),('analyst3', 76, 82, '#ffd700'),('analyst4', 65, 79, '#ff6b35')] %}
+                {% for name, cases_closed, sla, color in analysts %}
+                <div style="margin-bottom:14px;">
+                    <div class="d-flex justify-content-between mb-1"><span style="font-size:12px;color:var(--text-secondary);">{{ name }}</span><span style="font-size:12px;color:{{ color }};font-weight:600;">{{ cases_closed }} cases</span></div>
+                    <div style="height:5px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;"><div style="width:{{ cases_closed }}%;height:100%;background:{{ color }};border-radius:3px;"></div></div>
+                </div>
+                {% endfor %}
+            </div></div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card"><div class="card-header"><i class="fas fa-clock" style="color:#ffd700;"></i><span class="card-title">Response Time Trend</span></div><div class="card-body"><canvas id="mttrChart" height="200"></canvas></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Generate Report Modal -->
+<div id="generateModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center;">
+    <div style="background:#141824;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:24px;width:440px;max-width:90%;">
+        <div style="font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">Generate Report</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;" id="generateModalTitle"></div>
+        <div class="mb-3">
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Date Range</label>
+            <div class="d-flex gap-2">
+                <input type="date" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;border-radius:8px;padding:8px 12px;font-size:12px;outline:none;">
+                <input type="date" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;border-radius:8px;padding:8px 12px;font-size:12px;outline:none;">
+            </div>
+        </div>
+        <div class="mb-3">
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Output Format</label>
+            <div class="d-flex gap-2">
+                {% for fmt in ['PDF', 'DOCX', 'CSV', 'HTML'] %}
+                <label style="flex:1;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;text-align:center;cursor:pointer;font-size:12px;color:var(--text-muted);">
+                    <input type="radio" name="reportFormat" value="{{ fmt }}" style="display:none;" {{ 'checked' if fmt == 'PDF' else '' }}>{{ fmt }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="mb-4">
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Send to (optional)</label>
+            <input type="email" placeholder="email@company.com" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn-primary-custom" style="flex:1;" onclick="confirmGenerate()"><i class="fas fa-file-download"></i> Generate Now</button>
+            <button onclick="closeGenerateModal()" style="flex:1;padding:9px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);border-radius:8px;font-size:13px;cursor:pointer;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+
+let currentReport = '';
+
+function generateReport(name) {
+    currentReport = name;
+    document.getElementById('generateModalTitle').textContent = name;
+    document.getElementById('generateModal').style.display = 'flex';
+}
+
+function closeGenerateModal() {
+    document.getElementById('generateModal').style.display = 'none';
+}
+
+function confirmGenerate() {
+    closeGenerateModal();
+    const flash = document.createElement('div');
+    flash.style.cssText = 'position:fixed;top:80px;right:20px;z-index:3000;background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;padding:12px 20px;border-radius:10px;font-size:13px;display:flex;align-items:center;gap:8px;';
+    flash.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating "' + currentReport + '"...';
+    document.body.appendChild(flash);
+    setTimeout(() => {
+        flash.innerHTML = '<i class="fas fa-check-circle"></i> "' + currentReport + '" generated successfully!';
+        flash.style.background = 'rgba(0,255,136,0.15)';
+        flash.style.borderColor = 'rgba(0,255,136,0.3)';
+        flash.style.color = '#00ff88';
+        setTimeout(() => flash.remove(), 3000);
+    }, 2000);
+}
+
+function scheduleReport(name) { alert('Schedule report: ' + name); }
+
+document.querySelectorAll('input[name="reportFormat"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        document.querySelectorAll('input[name="reportFormat"]').forEach(r => {
+            r.parentElement.style.background = 'rgba(255,255,255,0.05)';
+            r.parentElement.style.borderColor = 'rgba(255,255,255,0.1)';
+            r.parentElement.style.color = 'var(--text-muted)';
+        });
+        this.parentElement.style.background = 'rgba(0,212,255,0.15)';
+        this.parentElement.style.borderColor = 'rgba(0,212,255,0.3)';
+        this.parentElement.style.color = '#00d4ff';
+    });
+});
+
+new Chart(document.getElementById('reportActivityChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets: [{ data: [4,7,5,9,12,3,2], backgroundColor: 'rgba(168,85,247,0.6)', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 9 } } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 9 } }, beginAtZero: true } } }
+});
+
+new Chart(document.getElementById('securityTrendChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: Array.from({length:30}, (_,i)=>{const d=new Date();d.setDate(d.getDate()-(29-i));return d.toLocaleDateString('en',{month:'short',day:'numeric'})}).filter((_,i)=>i%3===0),
+        datasets: [
+            { label: 'Alerts', data: [45,52,38,61,48,55,42,67,58,53], borderColor: '#ff4757', backgroundColor: 'rgba(255,71,87,0.08)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3 },
+            { label: 'Incidents', data: [8,12,6,15,9,11,7,14,10,8], borderColor: '#ffd700', backgroundColor: 'rgba(255,215,0,0.06)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3 },
+            { label: 'Resolved', data: [40,48,35,58,45,52,40,64,55,50], borderColor: '#00ff88', backgroundColor: 'rgba(0,255,136,0.06)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3 }
+        ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: '#64748b', font: { size: 10 }, boxWidth: 10, padding: 10 } } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 } } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b' }, beginAtZero: true } } }
+});
+
+new Chart(document.getElementById('alertDistChart').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: ['Malware', 'Network', 'Auth', 'Endpoint', 'Other'], datasets: [{ data: [35, 25, 20, 15, 5], backgroundColor: ['#ff4757','#00d4ff','#a855f7','#ffd700','#64748b'], borderWidth: 0, hoverOffset: 5 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { color: '#64748b', font: { size: 10 }, boxWidth: 10, padding: 6 } } } }
+});
+
+new Chart(document.getElementById('mttrChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: ['W1','W2','W3','W4','W5','W6','W7','W8'], datasets: [{ label: 'MTTR (hours)', data: [12, 10, 11, 8, 9, 7, 8, 8.7], borderColor: '#ffd700', backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#ffd700' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 } } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b' }, beginAtZero: true } } }
+});
+</script>
+{% endblock %}

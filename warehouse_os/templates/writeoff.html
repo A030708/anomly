@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Inventory Write-Off{% endblock %}
+{% block header_title %}Inventory Write-Off{% endblock %}
+{% block content %}
+
+<h1 class="wos-page-title" style="margin-bottom: 8px;">Inventory Write-Off</h1>
+<p style="color: var(--wos-text-muted); margin-bottom: 24px;">Record damaged, expired, or lost stock.</p>
+
+<div style="max-width: 800px;">
+    <form method="POST" action="{{ url_for('submit_writeoff') }}" class="wos-card" style="padding: 24px; margin-bottom: 32px; display: flex; flex-direction: column; gap: 16px;">
+        
+        <div>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Product (SKU)</label>
+            <select name="sku" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+                {% for product in products %}
+                    <option value="{{ product.sku }}" 
+                            data-price="{{ product.unit_value }}"
+                            data-stock="{{ product.stock_count }}">
+                        {{ product.sku }} — {{ product.name }} (Stock: {{ product.stock_count }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Quantity</label>
+            <input type="number" name="quantity" min="1" required placeholder="e.g. 10" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+        </div>
+
+        <div>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Reason</label>
+            <select name="reason" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+                <option value="Damaged">Damaged</option>
+                <option value="Expired">Expired</option>
+                <option value="Lost">Lost</option>
+                <option value="Theft">Theft</option>
+            </select>
+        </div>
+
+        <div>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Notes (optional)</label>
+            <textarea name="notes" rows="2" placeholder="Additional context..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;"></textarea>
+        </div>
+
+        <div id="value_preview" style="background: #fefce8; border: 1px solid #fef08a; padding: 12px; border-radius: var(--wos-radius-md); color: #854d0e; font-size: 14px; display: none;">
+            Estimated value being written off: <strong id="estimated_value" style="font-weight: 700;">₹0</strong>
+        </div>
+
+        <button type="submit" class="wos-btn wos-btn-danger" style="width: 100%; padding: 12px; font-size: 15px; margin-top: 8px;">
+            <i class="fa-solid fa-triangle-exclamation"></i> Submit Write-Off
+        </button>
+    </form>
+
+    <!-- Recent Write-Offs -->
+    <div class="wos-card">
+        <div style="padding: 16px 24px; border-bottom: 1px solid var(--wos-border); font-weight: 700; font-size: 16px;">
+            Recent Write-Offs
+        </div>
+        <div class="wos-table-wrapper" style="border: none; border-radius: 0 0 var(--wos-radius-lg) var(--wos-radius-lg); box-shadow: none;">
+            <table class="wos-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>SKU</th>
+                        <th>Qty</th>
+                        <th>Reason</th>
+                        <th>By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for movement in recent_writeoffs %}
+                    <tr>
+                        <td style="color: var(--wos-text-muted);">{{ movement['timestamp'][:16].replace('T',' ') }}</td>
+                        <td style="font-family: monospace; font-weight: 500;">{{ movement['sku'] }}</td>
+                        <td style="font-weight: 700; color: var(--wos-danger);">-{{ movement['quantity'] }}</td>
+                        <td>
+                            <span class="wos-badge wos-badge-neutral">{{ movement['reason'] or '-' }}</span>
+                        </td>
+                        <td style="color: var(--wos-text-muted);">{{ movement['performed_by'] or 'Unknown' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 32px; color: var(--wos-text-muted);">No write-offs yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const skuSelect = document.querySelector('select[name="sku"]');
+    const quantityInput = document.querySelector('input[name="quantity"]');
+    const preview = document.getElementById('value_preview');
+    const estimatedValue = document.getElementById('estimated_value');
+
+    function updatePreview() {
+        const selectedOption = skuSelect.options[skuSelect.selectedIndex];
+        const price = parseFloat(selectedOption.dataset.price || 0);
+        const qty = parseInt(quantityInput.value || 0);
+        const total = price * qty;
+        if (total > 0) {
+            preview.style.display = 'block';
+            estimatedValue.textContent = '₹' + total.toLocaleString();
+        } else {
+            preview.style.display = 'none';
+        }
+    }
+
+    skuSelect.addEventListener('change', updatePreview);
+    quantityInput.addEventListener('input', updatePreview);
+</script>
+
+{% endblock %}

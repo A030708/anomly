@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - {{ platform_name }}{% endblock %}
+{% block page_title %}Security Dashboard{% endblock %}
+{% block breadcrumb %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .threat-meter {
+        position: relative;
+        height: 8px;
+        background: rgba(255,255,255,0.08);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .threat-meter-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 1s ease;
+    }
+    .activity-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        margin-top: 5px;
+        flex-shrink: 0;
+    }
+    .activity-text { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+    .activity-time { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .geo-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 0;
+    }
+    .geo-flag { font-size: 20px; }
+    .geo-bar-wrap { flex: 1; }
+    .geo-bar {
+        height: 4px;
+        background: rgba(255,255,255,0.06);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+    .geo-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent-blue), var(--accent-blue-dark));
+        border-radius: 2px;
+    }
+    .geo-count { font-size: 12px; color: var(--text-muted); min-width: 30px; text-align: right; }
+    .scroll-activity { height: 300px; overflow-y: auto; }
+    .mitre-chip {
+        display: inline-block;
+        padding: 3px 9px;
+        background: rgba(168,85,247,0.1);
+        border: 1px solid rgba(168,85,247,0.2);
+        border-radius: 20px;
+        font-size: 10px;
+        color: #a855f7;
+        margin: 2px;
+    }
+    .top-threat-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .top-threat-item:last-child { border-bottom: none; }
+    .threat-rank {
+        width: 24px; height: 24px;
+        background: rgba(255,255,255,0.06);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        flex-shrink: 0;
+    }
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    @media(max-width:1100px){ .kpi-grid{grid-template-columns:repeat(2,1fr);} }
+    @media(max-width:600px){ .kpi-grid{grid-template-columns:1fr;} }
+    .pulse-dot {
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.4; }
+        100% { opacity: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Row -->
+<div class="kpi-grid">
+    <!-- Total Alerts -->
+    <div class="stat-card">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="stat-label">Total Alerts</div>
+                <div class="stat-value text-danger">{{ stats.total_alerts }}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(255,71,87,0.1);">
+                <i class="fas fa-bell" style="color:#ff4757;"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Open Incidents -->
+    <div class="stat-card">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="stat-label">Open Incidents</div>
+                <div class="stat-value text-warning">{{ stats.open_incidents }}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(255,107,53,0.1);">
+                <i class="fas fa-fire" style="color:#ff6b35;"></i>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Threats Blocked -->
+    <div class="stat-card">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="stat-label">Threats Blocked</div>
+                <div class="stat-value" style="color:#00ff88;">{{ stats.threats_blocked }}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(0,255,136,0.1);">
+                <i class="fas fa-shield-check" style="color:#00ff88;"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Second KPI Row -->
+<div class="kpi-grid">
+    <!-- Critical Threats -->
+    <div class="stat-card">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="stat-label">Critical Threats</div>
+                <div class="stat-value" style="color:#ff4757;" id="kpi-critical">{{ stats.critical_threats_open }}</div>
+                <div class="stat-change text-muted">
+                    <i class="fas fa-shield"></i>
+                    <span>Open & investigating</span>
+                </div>
+            </div>
+            <div class="stat-icon" style="background:rgba(168,85,247,0.1);">
+                <i class="fas fa-skull-crossbones" style="color:#a855f7;"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sessions Revoked Today -->
+    <div class="stat-card">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="stat-label">Sessions Revoked</div>
+                <div class="stat-value" style="color:#ff6b35;" id="kpi-sessions">{{ stats.sessions_revoked_today }}</div>
+                <div class="stat-change text-muted">
+                    <i class="fas fa-clock"></i>
+                    <span>Today</span>
+                </div>
+            </div>
+            <div class="stat-icon" style="background:rgba(255,107,53,0.1);">
+                <i class="fas fa-user-slash" style="color:#ff6b35;"></i>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Total Events Today -->
+    <div class="stat-card">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="stat-label">Total Events Today</div>
+                <div class="stat-value" style="color:#94a3b8;" id="kpi-events">{{ stats.total_events_today }}</div>
+                <div class="stat-change text-muted">
+                    <i class="fas fa-arrow-up"></i>
+                    <span id="kpi-anomalies">{{ stats.anomalies_detected_today }} anomalies</span>
+                </div>
+            </div>
+            <div class="stat-icon" style="background:rgba(255,255,255,0.05);">
+                <i class="fas fa-list-ul" style="color:#94a3b8;"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 2: Charts -->
+<div class="row g-4 mb-4">
+    <!-- Alerts Timeline -->
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-chart-line" style="color:#00d4ff;"></i>
+                <span class="card-title">Alert Activity (Last 7 Days)</span>
+
+            </div>
+            <div class="card-body" style="height:220px;">
+                <canvas id="alertTimelineChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Severity Breakdown -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-chart-pie" style="color:#a855f7;"></i>
+                <span class="card-title">Severity Breakdown</span>
+            </div>
+            <div class="card-body" style="height:260px;">
+                <canvas id="severityChart" height="200"></canvas>
+                <div class="mt-3">
+                    {% set severities = [
+                        ('Critical', '#ff4757', stats.critical_count),
+                        ('High', '#ff6b35', stats.high_count),
+                        ('Medium', '#ffd700', stats.medium_count),
+                        ('Low', '#00d4ff', stats.low_count)
+                    ] %}
+                    {% for label, color, count in severities %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div style="width:10px;height:10px;border-radius:2px;background:{{color}};"></div>
+                            <span style="font-size:12px;color:var(--text-secondary);">{{label}}</span>
+                        </div>
+                        <span style="font-size:12px;font-weight:600;color:{{color}};">{{count}}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 3: Live Anomaly Feed + Threat Level -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-satellite-dish" style="color:#ff4757;"></i>
+                    <span class="card-title">Live Anomaly Feed</span>
+                </div>
+                <span class="badge bg-danger pulse-dot" style="font-size:9px;">LIVE</span>
+            </div>
+            <div class="card-body" style="padding:16px 20px; height: 340px; max-height: 340px; overflow-y: auto;" id="live-anomaly-feed">
+                <div class="empty-state">
+                    <i class="fas fa-circle-notch fa-spin"></i>
+                    <p>Listening for anomalies...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-gauge" style="color:#ff6b35;"></i>
+                <span class="card-title">Threat Level</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span style="font-size:13px;color:var(--text-secondary);">Current Risk Score</span>
+                    <span style="font-size:20px;font-weight:700;color:#ff6b35;">{{ stats.risk_score }}%</span>
+                </div>
+                <div class="threat-meter mb-3">
+                    <div class="threat-meter-fill"
+                         style="width:{{ stats.risk_score }}%;background:linear-gradient(90deg,#00ff88,#ffd700,#ff4757);">
+                    </div>
+                </div>
+                <div class="row g-2 mt-2">
+                    {% set threat_levels = [('Critical', stats.critical_count, '#ff4757'), ('High', stats.high_count, '#ff6b35'), ('Medium', stats.medium_count, '#ffd700'), ('Low', stats.low_count, '#00d4ff')] %}
+                    {% for level, count, color in threat_levels %}
+                    <div class="col-6">
+                        <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 12px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;">{{level}}</div>
+                            <div style="font-size:18px;font-weight:700;color:{{color}};">{{count}}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 4 -->
+<div class="row g-4 mb-4">
+    <!-- Recent Alerts Table -->
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-bell" style="color:#ff4757;"></i>
+                <span class="card-title">Recent Alerts</span>
+                <a href="{{ url_for('alerts.list_alerts') }}" class="ms-auto"
+                   style="font-size:12px;color:#00d4ff;text-decoration:none;">
+                    View All <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+            <div class="table-responsive" style="max-height:340px;overflow-y:auto;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Alert</th>
+                            <th>Severity</th>
+                            <th>Source</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if recent_alerts %}
+                            {% for alert in recent_alerts %}
+                            <tr style="cursor:pointer;"
+                                onclick="window.location='{{ url_for('alerts.alert_detail', alert_id=alert.id) }}'">
+                                <td>
+                                    <div style="font-size:13px;font-weight:500;">{{ alert.title[:40] }}{% if alert.title|length > 40 %}...{% endif %}</div>
+                                    <div style="font-size:11px;color:var(--text-muted);">{{ alert.alert_type }}</div>
+                                </td>
+                                <td>
+                                    <span class="severity-badge severity-{{ alert.severity|lower }}">
+                                        {{ alert.severity }}
+                                    </span>
+                                </td>
+                                <td style="font-size:12px;color:var(--text-secondary);">
+                                    {{ alert.source_ip or 'N/A' }}
+                                </td>
+                                <td class="local-time" data-utc="{{ alert.created_at.isoformat() if alert.created_at else '' }}" style="font-size:11px;color:var(--text-muted);">
+                                    {{ alert.created_at.strftime('%H:%M %d/%m') if alert.created_at else 'N/A' }}
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ alert.status|lower }}">
+                                        {{ alert.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <i class="fas fa-bell-slash"></i>
+                                        <p>No alerts found</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-timeline" style="color:#00d4ff;"></i>
+                <span class="card-title">Recent Activity</span>
+            </div>
+            <div class="card-body" style="padding:16px 20px; height: 340px; max-height: 340px; overflow-y: auto;">
+                {% if activities %}
+                    {% for act in activities %}
+                    <div class="activity-item">
+                        <div class="activity-dot"
+                             style="background:{{ '#ff4757' if act.severity=='critical' else '#ff6b35' if act.severity=='high' else '#ffd700' if act.severity in ('medium','warning') else '#00d4ff' }};"></div>
+                        <div>
+                            <div class="activity-text">{{ act.text }}</div>
+                            <div class="activity-time"><i class="fas fa-clock me-1"></i>{{ act.time }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-timeline"></i>
+                        <p>No activity yet. Browse BoltMart or use WarehouseOS to generate telemetry.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const chartDefaults = {
+    color: '#94a3b8',
+    font: { family: 'Segoe UI', size: 11 }
+};
+Chart.defaults.color = chartDefaults.color;
+Chart.defaults.font = chartDefaults.font;
+
+// ── Alert Timeline Chart ──
+const tlCtx = document.getElementById('alertTimelineChart').getContext('2d');
+const gradient = tlCtx.createLinearGradient(0, 0, 0, 200);
+gradient.addColorStop(0, 'rgba(0, 212, 255, 0.25)');
+gradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
+
+new Chart(tlCtx, {
+    type: 'line',
+    data: {
+        labels: {{ chart_labels | tojson }},
+        datasets: [{
+            label: 'Alerts',
+            data: {{ chart_data | tojson }},
+            borderColor: '#00d4ff',
+            backgroundColor: gradient,
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: '#00d4ff',
+            pointBorderColor: '#0a0e1a',
+            pointBorderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: {
+                grid: { color: 'rgba(255,255,255,0.04)' },
+                ticks: { color: '#64748b' }
+            },
+            y: {
+                grid: { color: 'rgba(255,255,255,0.04)' },
+                ticks: { color: '#64748b', stepSize: 5 },
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// ── Severity Donut Chart ──
+new Chart(document.getElementById('severityChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Critical', 'High', 'Medium', 'Low'],
+        datasets: [{
+            data: [{{ stats.critical_count }}, {{ stats.high_count }},
+                   {{ stats.medium_count }}, {{ stats.low_count }}],
+            backgroundColor: ['#ff4757', '#ff6b35', '#ffd700', '#00d4ff'],
+            borderWidth: 0,
+            hoverOffset: 8
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '70%',
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: ctx => ` ${ctx.label}: ${ctx.parsed}`
+                }
+            }
+        }
+    }
+});
+
+
+</script>
+
+<script>
+// ── Live KPI Refresh (every 30s from /api/dashboard/stats) ──
+async function refreshKPIs() {
+    try {
+        const resp = await fetch('/dashboard/api/stats');
+        const data = await resp.json();
+
+        document.getElementById('kpi-critical').textContent = data.critical_threats_open ?? '0';
+        document.getElementById('kpi-sessions').textContent = data.sessions_revoked_today ?? '0';
+        document.getElementById('kpi-events').textContent = data.total_events_today ?? '0';
+
+        const anomaliesEl = document.getElementById('kpi-anomalies');
+        if (anomaliesEl) {
+            anomaliesEl.textContent = (data.anomalies_detected_today ?? '0') + ' anomalies';
+        }
+
+        const kpiTotalAlerts = document.querySelector('.stat-value.text-danger');
+        if (kpiTotalAlerts) kpiTotalAlerts.textContent = data.total_alerts ?? '0';
+
+        const kpiOpenIncidents = document.querySelector('.stat-value.text-warning');
+        if (kpiOpenIncidents) kpiOpenIncidents.textContent = data.open_incidents ?? '0';
+
+        const kpiThreatsBlocked = document.querySelectorAll('.stat-value')[2];
+        if (kpiThreatsBlocked && data.threats_blocked != null) kpiThreatsBlocked.textContent = data.threats_blocked;
+    } catch (e) {
+        console.log('KPI refresh failed (expected before first telemetry):', e);
+    }
+}
+
+// ── Live Anomaly Feed Refresh ──
+async function refreshAnomalies() {
+    try {
+        const resp = await fetch('/dashboard/api/recent_anomalies');
+        const data = await resp.json();
+        const feedEl = document.getElementById('live-anomaly-feed');
+        if (!feedEl) return;
+        
+        if (data.anomalies && data.anomalies.length > 0) {
+            feedEl.innerHTML = '';
+            data.anomalies.forEach(ano => {
+                const color = ano.severity === 'High' ? '#ff4757' : (ano.severity === 'Medium' ? '#ff6b35' : '#ffd700');
+                feedEl.innerHTML += `
+                    <div class="activity-item">
+                        <div class="activity-dot" style="background:${color};"></div>
+                        <div>
+                            <div class="activity-text" style="color:${color};font-weight:600;">${ano.title}</div>
+                            <div class="activity-text">${ano.alert_type}</div>
+                            <div class="activity-time"><i class="fas fa-clock me-1"></i>${ano.time_ago}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    } catch (e) {
+        console.log('Anomaly feed refresh failed:', e);
+    }
+}
+
+setInterval(refreshKPIs, 30000);
+setTimeout(refreshKPIs, 5000);
+setInterval(refreshAnomalies, 5000);
+setTimeout(refreshAnomalies, 1000);
+</script>
+{% endblock %}

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}WarehouseOS{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="wos-layout">
+    {% if current_user %}
+    <aside class="wos-sidebar">
+        <div class="wos-sidebar-logo">
+            <i class="fa-solid fa-boxes-stacked"></i> WarehouseOS
+        </div>
+        
+        <nav style="flex-grow: 1;">
+            <div class="wos-nav-section">Main</div>
+            <a href="{{ url_for('dashboard') }}" class="wos-nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <i class="fa-solid fa-chart-line"></i> Dashboard
+            </a>
+            {% if current_user.role != 'delivery' %}
+            <a href="{{ url_for('fulfillment') }}" class="wos-nav-link {% if request.endpoint == 'fulfillment' %}active{% endif %}">
+                <i class="fa-solid fa-clipboard-list"></i> Fulfillment
+            </a>
+            {% endif %}
+            <a href="{{ url_for('delivery_queue') }}" class="wos-nav-link {% if request.endpoint in ['delivery_queue', 'deliver_order'] %}active{% endif %}">
+                <i class="fa-solid fa-truck"></i> Delivery
+            </a>
+
+            {% if current_user.role != 'delivery' %}
+            <div class="wos-nav-section">Inventory</div>
+            <a href="{{ url_for('inventory') }}" class="wos-nav-link {% if request.endpoint == 'inventory' %}active{% endif %}">
+                <i class="fa-solid fa-box"></i> Inventory
+            </a>
+            {% if current_user.role in ['admin', 'manager'] %}
+            <a href="{{ url_for('stock_in') }}" class="wos-nav-link {% if request.endpoint == 'stock_in' %}active{% endif %}">
+                <i class="fa-solid fa-arrow-down"></i> Stock Receiving
+            </a>
+            {% endif %}
+            <a href="{{ url_for('inventory_movements') }}" class="wos-nav-link {% if request.endpoint == 'inventory_movements' %}active{% endif %}">
+                <i class="fa-solid fa-arrows-spin"></i> Movements
+            </a>
+            <a href="{{ url_for('writeoff_page') }}" class="wos-nav-link {% if request.endpoint == 'writeoff_page' %}active{% endif %}">
+                <i class="fa-solid fa-triangle-exclamation"></i> Write-Off
+            </a>
+            {% endif %}
+            
+            {% if current_user.role in ['admin', 'manager'] %}
+            <div class="wos-nav-section">Reports</div>
+            <a href="{{ url_for('export_page') }}" class="wos-nav-link {% if request.endpoint == 'export_page' %}active{% endif %}">
+                <i class="fa-solid fa-file-export"></i> Export
+            </a>
+            {% endif %}
+            
+            {% if current_user.role in ['admin', 'manager'] %}
+            <div class="wos-nav-section">Purchasing</div>
+            <a href="{{ url_for('purchase_orders_list') }}" class="wos-nav-link {% if request.endpoint in ['purchase_orders_list', 'purchase_order_new', 'purchase_order_detail', 'po_discrepancies'] %}active{% endif %}">
+                <i class="fa-solid fa-file-invoice"></i> Purchase Orders
+            </a>
+            <a href="{{ url_for('suppliers_list') }}" class="wos-nav-link {% if request.endpoint in ['suppliers_list', 'supplier_new'] %}active{% endif %}">
+                <i class="fa-solid fa-truck-field"></i> Suppliers
+            </a>
+            {% endif %}
+            
+            {% if current_user.role == 'admin' %}
+            <div class="wos-nav-section">Admin</div>
+            <a href="{{ url_for('audit_page') }}" class="wos-nav-link {% if request.endpoint == 'audit_page' %}active{% endif %}">
+                <i class="fa-solid fa-list-check"></i> Audit
+            </a>
+            <a href="{{ url_for('admin_users') }}" class="wos-nav-link {% if request.endpoint in ['admin_users', 'user_new', 'user_edit'] %}active{% endif %}">
+                <i class="fa-solid fa-users-gear"></i> Users
+            </a>
+            <a href="{{ url_for('admin_categories') }}" class="wos-nav-link {% if request.endpoint == 'admin_categories' %}active{% endif %}">
+                <i class="fa-solid fa-tags"></i> Categories
+            </a>
+            {% endif %}
+        </nav>
+        
+        <div class="wos-sidebar-user">
+            <div class="name">{{ current_user.username }}</div>
+            <div class="role">{{ current_user.role }}</div>
+            <a href="{{ url_for('change_password') }}" style="display: block; color: rgba(255,255,255,0.5); text-decoration: none; font-size: 12px; margin-bottom: 10px;">
+                <i class="fa-solid fa-key"></i> Change Password
+            </a>
+            <a href="{{ url_for('logout') }}" class="wos-btn wos-btn-danger" style="width: 100%; justify-content: center; font-size: 12px; padding: 8px;">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </a>
+        </div>
+    </aside>
+    {% endif %}
+
+    <div class="wos-main">
+        {% if current_user %}
+        <header class="wos-header">
+            <div style="font-weight: 600; color: var(--wos-secondary); font-size: 15px;">
+                {% block header_title %}Overview{% endblock %}
+            </div>
+            <div></div>
+        </header>
+        {% endif %}
+        
+        <main class="wos-content">
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div style="margin-bottom: 20px;">
+                {% for message in messages %}
+                <div class="wos-flash wos-flash-info">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span style="flex-grow: 1;">{{ message }}</span>
+                    <button onclick="this.parentElement.remove()" style="background: none; border: none; color: inherit; cursor: pointer; font-size: 18px; padding: 0; line-height: 1; opacity: 0.6;">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+</body>
+</html>

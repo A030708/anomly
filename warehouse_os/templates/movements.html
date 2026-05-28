@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Inventory Movements{% endblock %}
+{% block header_title %}Inventory Movements{% endblock %}
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <h1 class="wos-page-title" style="margin-bottom: 0;">Inventory Movements</h1>
+</div>
+
+<form method="GET" style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 24px; flex-wrap: wrap;">
+  <div>
+    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--wos-text-muted);">Action</label>
+    <select name="action" style="padding: 6px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 13px; outline: none; background: white;">
+      <option value="">All</option>
+      {% for a in unique_actions %}
+      <option value="{{ a }}" {% if action_filter == a %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--wos-text-muted);">SKU</label>
+    <select name="sku" style="padding: 6px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 13px; outline: none; background: white;">
+      <option value="">All</option>
+      {% for s in unique_skus %}
+      <option value="{{ s }}" {% if sku_filter == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="wos-btn wos-btn-primary" style="padding: 6px 16px;">Filter</button>
+  <a href="{{ url_for('inventory_movements') }}" class="wos-btn wos-btn-secondary" style="padding: 6px 16px;">Clear</a>
+</form>
+
+<div class="wos-card wos-table-wrapper">
+  <table class="wos-table">
+    <thead>
+      <tr><th>Time</th><th>SKU</th><th>Product</th><th>Action</th><th>Qty</th><th>Reason</th><th>By</th></tr>
+    </thead>
+    <tbody>
+      {% for m in movements %}
+      <tr>
+        <td style="color: var(--wos-text-muted); font-size: 12px;">{{ m.timestamp[:19].replace('T', ' ') }}</td>
+        <td style="font-family: monospace; font-weight: 500;">{{ m.sku }}</td>
+        <td>{{ product_names.get(m.sku, '-') }}</td>
+        <td>
+          <span class="wos-badge
+            {% if m.action == 'stock_in' %}wos-badge-success
+            {% elif m.action == 'writeoff' %}wos-badge-danger
+            {% elif m.action == 'dispatched' %}wos-badge-info
+            {% else %}wos-badge-neutral{% endif %}">
+            {{ m.action }}
+          </span>
+        </td>
+        <td style="font-weight: 700; {% if m.action == 'stock_in' %}color: var(--wos-success);{% elif m.action in ('writeoff','dispatched') %}color: var(--wos-danger);{% endif %}">
+          {{ '+' if m.action == 'stock_in' else '-' }}{{ m.quantity }}
+        </td>
+        <td style="color: var(--wos-text-muted); font-size: 13px;">{{ m.reason or '-' }}</td>
+        <td style="color: var(--wos-text-muted); font-size: 13px;">{{ m.performed_by or 'System' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--wos-text-muted);">No movements found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page > 1 %}
+<div style="margin-top: 16px;">
+  <a href="{{ url_for('inventory_movements', action=action_filter, sku=sku_filter, page=page-1) }}" class="wos-btn wos-btn-secondary">&larr; Previous</a>
+</div>
+{% endif %}
+
+{% endblock %}

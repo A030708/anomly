@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}WarehouseOS Simulation{% endblock %}
+{% block header_title %}Attack Simulation{% endblock %}
+{% block content %}
+
+<h1 class="wos-page-title" style="margin-bottom: 8px;">🎭 Simulation Panel</h1>
+<p style="color: var(--wos-text-muted); margin-bottom: 24px;">Trigger attack simulations against your systems. Each button runs a real attack that Sentinel XDR should detect.</p>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px;">
+
+    <!-- Brute Force -->
+    <div class="wos-card" style="padding: 24px; border-top: 4px solid #f97316;">
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">🔨 Brute Force Attack</h3>
+        <p style="font-size: 14px; color: var(--wos-text-muted); margin-bottom: 24px;">Sends 30 failed login attempts to WarehouseOS from a fake IP. Triggers Rule 1.</p>
+        <form method="POST" action="{{ url_for('run_simulation') }}">
+            <input type="hidden" name="attack_type" value="brute_force">
+            <button type="submit" class="wos-btn" style="width: 100%; background: #ea580c; color: white; border: none; padding: 10px; font-weight: 700;">
+                Run Brute Force Simulation
+            </button>
+        </form>
+    </div>
+
+    <!-- Insider Theft -->
+    <div class="wos-card" style="padding: 24px; border-top: 4px solid #dc2626;">
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">🏴 Insider Theft</h3>
+        <p style="font-size: 14px; color: var(--wos-text-muted); margin-bottom: 24px;">Submits a high-value write-off at 2:30 AM as a staff user. Triggers Rule 4.</p>
+        <form method="POST" action="{{ url_for('run_simulation') }}">
+            <input type="hidden" name="attack_type" value="insider_theft">
+            <button type="submit" class="wos-btn" style="width: 100%; background: #b91c1c; color: white; border: none; padding: 10px; font-weight: 700;">
+                Run Insider Theft Simulation
+            </button>
+        </form>
+    </div>
+
+    <!-- Privilege Escalation -->
+    <div class="wos-card" style="padding: 24px; border-top: 4px solid #9333ea;">
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">⬆️ Privilege Escalation</h3>
+        <p style="font-size: 14px; color: var(--wos-text-muted); margin-bottom: 24px;">Staff session attempts to access admin routes. Triggers Rule 5.</p>
+        <form method="POST" action="{{ url_for('run_simulation') }}">
+            <input type="hidden" name="attack_type" value="privilege_escalation">
+            <button type="submit" class="wos-btn" style="width: 100%; background: #7e22ce; color: white; border: none; padding: 10px; font-weight: 700;">
+                Run Privilege Escalation Simulation
+            </button>
+        </form>
+    </div>
+
+    <!-- Data Exfiltration -->
+    <div class="wos-card" style="padding: 24px; border-top: 4px solid #db2777;">
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">📤 Data Exfiltration</h3>
+        <p style="font-size: 14px; color: var(--wos-text-muted); margin-bottom: 24px;">Triggers 3 export functions within 15 seconds. Triggers Rule 6.</p>
+        <form method="POST" action="{{ url_for('run_simulation') }}">
+            <input type="hidden" name="attack_type" value="data_exfiltration">
+            <button type="submit" class="wos-btn" style="width: 100%; background: #be185d; color: white; border: none; padding: 10px; font-weight: 700;">
+                Run Data Exfiltration Simulation
+            </button>
+        </form>
+    </div>
+
+    <!-- Reset Demo -->
+    <div class="wos-card" style="padding: 24px; border-top: 4px solid #16a34a; grid-column: 1 / -1;">
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">🔄 Reset Demo State</h3>
+        <p style="font-size: 14px; color: var(--wos-text-muted); margin-bottom: 24px;">Clears blocked IPs, resets orders, reseeds stock. Takes 3 seconds.</p>
+        <form method="POST" action="{{ url_for('run_simulation') }}">
+            <input type="hidden" name="attack_type" value="reset_demo">
+            <button type="submit" class="wos-btn" style="width: 100%; background: #15803d; color: white; border: none; padding: 16px; font-weight: 700; font-size: 16px;">
+                Reset Entire Demo State
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}Incident #{{ incident.id }} - {{ platform_name }}{% endblock %}
+{% block page_title %}Incident Detail{% endblock %}
+{% block breadcrumb %}
+    <a href="{{ url_for('incidents.list_incidents') }}"
+       style="color:#00d4ff;text-decoration:none;">Incidents</a> / #{{ incident.id }}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+    <!-- Left: Main Content -->
+    <div class="col-lg-8">
+
+        <!-- Header Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-fire" style="color:#ff6b35;"></i>
+                <span class="card-title">{{ incident.title }}</span>
+                <span class="severity-badge severity-{{ incident.severity|lower }} ms-2">
+                    {{ incident.severity }}
+                </span>
+                <span class="status-badge status-{{ incident.status|lower }} ms-1">
+                    {{ incident.status }}
+                </span>
+            </div>
+            <div class="card-body">
+                <p style="color:var(--text-secondary);font-size:14px;line-height:1.7;margin-bottom:20px;">
+                    {{ incident.description or 'No description provided.' }}
+                </p>
+                {% if incident.description and '\nANALYSIS:' in incident.description %}
+                <div style="background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:16px;margin-bottom:16px;">
+                    <div style="font-size:11px;color:#ffd700;font-weight:600;margin-bottom:8px;">
+                        <i class="fas fa-robot me-1"></i>LLM Investigation Available
+                    </div>
+                    <div style="font-size:12px;color:#94a3b8;line-height:1.6;white-space:pre-wrap;">{{ incident.description }}</div>
+                </div>
+                {% endif %}
+
+                <!-- Detail Grid -->
+                <div class="row g-3">
+                    {% set fields = [
+                        ('Incident ID',  '#' ~ incident.id,                'fas fa-hashtag'),
+                        ('Priority',     incident.priority or 'P2',         'fas fa-flag'),
+                        ('Category',     incident.category or 'N/A',        'fas fa-tag'),
+                        ('Alert Count',  incident.alert_count|string ~ ' alerts', 'fas fa-bell'),
+                    ] %}
+                    {% for label, value, icon in fields %}
+                    <div class="col-md-6">
+                        <div style="background:rgba(255,255,255,0.03);border-radius:8px;
+                                    padding:12px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">
+                                <i class="{{ icon }} me-1"></i>{{ label }}
+                            </div>
+                            <div style="font-size:14px;font-weight:500;color:#e2e8f0;">{{ value }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Related Alerts -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-bell" style="color:#ff4757;"></i>
+                <span class="card-title">Related Alerts ({{ incident.alert_count or 0 }})</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Alert</th><th>Severity</th>
+                            <th>Source IP</th><th>Time</th><th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if related_alerts %}
+                            {% for alert in related_alerts %}
+                            <tr onclick="window.location='{{ url_for('alerts.alert_detail', alert_id=alert.id) }}'"
+                                style="cursor:pointer;">
+                                <td>
+                                    <div style="font-size:13px;font-weight:500;">
+                                        {{ alert.title[:45] }}...
+                                    </div>
+                                    <div style="font-size:11px;color:var(--text-muted);">
+                                        #{{ alert.id }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="severity-badge severity-{{ alert.severity|lower }}">
+                                        {{ alert.severity }}
+                                    </span>
+                                </td>
+                                <td style="font-family:monospace;font-size:12px;color:#00d4ff;">
+                                    {{ alert.source_ip or '—' }}
+                                </td>
+                                <td style="font-size:11px;color:var(--text-muted);">
+                                    {% if alert.created_at %}<span class="utc-time" data-utc="{{ alert.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ alert.created_at.strftime('%H:%M %d/%m') }}</span>{% else %}N/A{% endif %}
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ alert.status|lower }}">
+                                        {{ alert.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="5">
+                                <div class="empty-state">
+                                    <i class="fas fa-bell-slash"></i>
+                                    <p>No related alerts</p>
+                                </div>
+                            </td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+
+    </div>
+
+    <!-- Right: Sidebar -->
+    <div class="col-lg-4">
+
+        <!-- Actions -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-bolt" style="color:#ffd700;"></i>
+                <span class="card-title">Actions</span>
+            </div>
+            <div class="card-body d-grid gap-2">
+                {% if incident.status != 'resolved' %}
+                <button onclick="showResolveModal()"
+                   class="btn-primary-custom justify-content-center"
+                   style="background:linear-gradient(135deg,#00ff88,#00cc66);">
+                    <i class="fas fa-check-circle"></i> Mark Resolved
+                </button>
+                <button id="investigateBtn" onclick="startInvestigation()"
+                   class="btn-primary-custom justify-content-center"
+                   style="background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.3);
+                          color:#ffd700;">
+                    <i class="fas fa-magnifying-glass"></i> Start Investigation
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+
+    </div>
+</div>
+
+<!-- Resolve Modal -->
+<div id="resolveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;"
+     onclick="if(event.target===this)closeResolveModal()">
+    <div style="background:#141824;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;max-width:480px;width:90%;">
+        <h3 style="color:#e2e8f0;font-size:18px;margin-bottom:8px;">Resolve Incident</h3>
+        <p style="color:#64748b;font-size:13px;margin-bottom:20px;">Choose how to resolve this incident. The blocked IP will be unblocked in both cases.</p>
+        <div class="d-grid gap-3">
+            <button onclick="resolveIncident('keep')"
+                    style="padding:14px 20px;background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.25);border-radius:12px;color:#e2e8f0;cursor:pointer;text-align:left;transition:all 0.2s;"
+                    onmouseover="this.style.background='rgba(0,255,136,0.18)'" onmouseout="this.style.background='rgba(0,255,136,0.1)'">
+                <div style="font-size:15px;font-weight:600;color:#00ff88;margin-bottom:4px;">
+                    <i class="fas fa-check-circle me-2"></i>Keep Account Active
+                </div>
+                <div style="font-size:12px;color:#64748b;">Resolve the incident and unblock the IP. The user account remains active.</div>
+            </button>
+            <button onclick="resolveIncident('deactivate')"
+                    style="padding:14px 20px;background:rgba(255,71,87,0.1);border:1px solid rgba(255,71,87,0.25);border-radius:12px;color:#e2e8f0;cursor:pointer;text-align:left;transition:all 0.2s;"
+                    onmouseover="this.style.background='rgba(255,71,87,0.18)'" onmouseout="this.style.background='rgba(255,71,87,0.1)'">
+                <div style="font-size:15px;font-weight:600;color:#ff4757;margin-bottom:4px;">
+                    <i class="fas fa-user-slash me-2"></i>Deactivate Account
+                </div>
+                <div style="font-size:12px;color:#64748b;">Resolve, unblock IP, and deactivate the user account. A deactivation email will be sent.</div>
+            </button>
+            <button onclick="closeResolveModal()"
+                    style="padding:10px;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#64748b;cursor:pointer;font-size:13px;">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showResolveModal() {
+    document.getElementById('resolveModal').style.display = 'flex';
+}
+
+function closeResolveModal() {
+    document.getElementById('resolveModal').style.display = 'none';
+}
+
+function resolveIncident(action) {
+    closeResolveModal();
+    fetch('/incidents/{{ incident.id }}/resolve', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: action})
+    }).then(r => r.json()).then(data => {
+        if (data.success) location.reload();
+    }).catch(() => location.reload());
+}
+
+function startInvestigation() {
+    const btn = document.getElementById('investigateBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing with LLM...';
+
+    fetch('/incidents/{{ incident.id }}/investigate', {
+        method: 'POST',
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            let html = '<div class="card mb-4" id="investigationResult" style="border:1px solid rgba(255,215,0,0.3);background:rgba(255,215,0,0.03);">' +
+                '<div class="card-header"><i class="fas fa-robot" style="color:#ffd700;"></i>' +
+                '<span class="card-title">LLM Investigation Report</span></div><div class="card-body">';
+
+            if (data.analysis) html += '<div style="margin-bottom:14px;"><div style="font-size:11px;color:#64748b;margin-bottom:4px;">ANALYSIS</div><p style="font-size:13px;color:#e2e8f0;line-height:1.6;">' + data.analysis + '</p></div>';
+            if (data.business_impact) html += '<div style="margin-bottom:14px;"><div style="font-size:11px;color:#64748b;margin-bottom:4px;">BUSINESS IMPACT</div><p style="font-size:13px;color:#ff6b35;line-height:1.6;">' + data.business_impact + '</p></div>';
+            if (data.attacker_goal) html += '<div style="margin-bottom:14px;"><div style="font-size:11px;color:#64748b;margin-bottom:4px;">ATTACKER GOAL</div><p style="font-size:13px;color:#ff4757;line-height:1.6;">' + data.attacker_goal + '</p></div>';
+            if (data.recommendation) html += '<div style="margin-bottom:14px;"><div style="font-size:11px;color:#64748b;margin-bottom:4px;">RECOMMENDATION</div><span class="severity-badge severity-' + (data.recommendation === 'BLOCK_IP' ? 'critical' : data.recommendation === 'RATE_LIMIT' ? 'high' : 'medium') + '">' + data.recommendation + '</span></div>';
+            if (data.reasoning) html += '<div style="margin-bottom:0;"><div style="font-size:11px;color:#64748b;margin-bottom:4px;">REASONING</div><p style="font-size:13px;color:#94a3b8;line-height:1.6;">' + data.reasoning + '</p></div>';
+
+            html += '</div></div>';
+
+            const detailGrid = document.querySelector('.card.mb-4 .card-body .row.g-3');
+            if (detailGrid) {
+                detailGrid.parentElement.insertAdjacentHTML('afterend', html);
+            }
+
+            btn.innerHTML = '<i class="fas fa-robot"></i> Investigation Complete';
+            btn.style.background = 'rgba(0,255,136,0.15)';
+            btn.style.border = '1px solid rgba(0,255,136,0.3)';
+            btn.style.color = '#00ff88';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magnifying-glass"></i> Start Investigation';
+            alert('Investigation failed: ' + (data.error || 'Unknown error'));
+        }
+    }).catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magnifying-glass"></i> Start Investigation';
+        alert('Error: ' + err.message);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.utc-time').forEach(function(el) {
+        var utcStr = el.getAttribute('data-utc');
+        if (utcStr) {
+            var d = new Date(utcStr + 'Z');
+            var opts = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            el.textContent = d.toLocaleString(undefined, opts);
+        }
+    });
+});
+</script>
+{% endblock %}

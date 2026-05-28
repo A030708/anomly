@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{% if product %}Edit {{ product.name }}{% else %}Add Product{% endif %}{% endblock %}
+{% block header_title %}{% if product %}Edit Product{% else %}Add Product{% endif %}{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('inventory') }}" style="color: var(--wos-accent); font-weight: 600; text-decoration: none; margin-bottom: 24px; display: inline-block;">
+  &larr; Back to Inventory
+</a>
+
+<div style="max-width: 600px;">
+  <form method="POST" enctype="multipart/form-data" class="wos-card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+    {% if product %}
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">SKU</label>
+      <input type="text" value="{{ product.sku }}" readonly style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none; background: var(--wos-bg);">
+      <small style="color: var(--wos-text-muted);">SKU cannot be changed after creation.</small>
+    </div>
+    {% endif %}
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Product Name</label>
+      <input type="text" name="name" value="{{ product.name if product else '' }}" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Category</label>
+      <select name="category" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+        <option value="" {% if not product or not product.category %}selected{% endif %}>-- Select Category --</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}" {% if product and product.category == cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div>
+        <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Stock Count</label>
+        <input type="number" name="stock_count" value="{{ product.stock_count if product else 0 }}" min="0" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+      </div>
+      <div>
+        <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Reorder Level</label>
+        <input type="number" name="reorder_level" value="{{ product.reorder_level if product else 10 }}" min="0" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+      </div>
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Unit Value (&#8377;)</label>
+      <input type="number" name="unit_value" value="{{ product.unit_value if product else 0 }}" min="0" step="0.01" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Product Image</label>
+      {% if product and product.image_url %}
+      <div style="margin-bottom: 8px;">
+        <img src="{{ url_for('static', filename='product_images/' + product.image_url) }}" style="max-width: 120px; max-height: 120px; border-radius: var(--wos-radius-md); border: 1px solid var(--wos-border);">
+      </div>
+      {% endif %}
+      <input type="file" name="product_image" accept="image/*" style="width: 100%; padding: 8px 0; font-family: inherit; font-size: 14px;">
+    </div>
+    <button type="submit" class="wos-btn wos-btn-primary" style="width: 100%; padding: 12px; font-size: 15px; margin-top: 8px;">
+      <i class="fa-solid fa-floppy-disk"></i> {% if product %}Save Changes{% else %}Add Product{% endif %}
+    </button>
+  </form>
+</div>
+
+{% endblock %}

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WarehouseOS Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;">
+    <div style="position: fixed; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(ellipse at 20% 50%, rgba(59,130,246,0.08) 0%, transparent 50%), radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.08) 0%, transparent 50%); pointer-events: none;"></div>
+
+    <div style="position: relative; width: 100%; max-width: 420px;">
+        <div style="background: rgba(255,255,255,0.98); backdrop-filter: blur(20px); border-radius: 20px; padding: 40px; box-shadow: 0 25px 60px rgba(0,0,0,0.3);">
+            <div style="text-align: center; margin-bottom: 8px;">
+                <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #3b82f6, #6366f1); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; box-shadow: 0 8px 20px rgba(59,130,246,0.3);">
+                    <i class="fa-solid fa-boxes-stacked" style="color: white; font-size: 24px;"></i>
+                </div>
+                <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">WarehouseOS</h1>
+                <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Internal logistics platform</p>
+            </div>
+
+            {% if error %}
+            <div style="background: #fef2f2; color: #dc2626; padding: 12px 16px; border-radius: 10px; margin: 20px 0; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-circle-exclamation"></i> {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" style="margin-top: 28px; display: flex; flex-direction: column; gap: 18px;">
+                <div>
+                    <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #334155;">Email</label>
+                    <input name="email" type="email" required value="manager@warehouse.com"
+                           style="width: 100%; padding: 12px 16px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: inherit; font-size: 14px; outline: none; transition: all 0.2s; box-sizing: border-box; background: #f8fafc;"
+                           onfocus="this.style.borderColor='#3b82f6'; this.style.background='white'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)'"
+                           onblur="this.style.borderColor='#e2e8f0'; this.style.background='#f8fafc'; this.style.boxShadow='none'">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #334155;">Password</label>
+                    <input name="password" type="password" required value="demo123"
+                           style="width: 100%; padding: 12px 16px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: inherit; font-size: 14px; outline: none; transition: all 0.2s; box-sizing: border-box; background: #f8fafc;"
+                           onfocus="this.style.borderColor='#3b82f6'; this.style.background='white'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)'"
+                           onblur="this.style.borderColor='#e2e8f0'; this.style.background='#f8fafc'; this.style.boxShadow='none'">
+                </div>
+                <button type="submit" style="width: 100%; padding: 13px; background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; border: none; border-radius: 10px; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 14px rgba(59,130,246,0.3); margin-top: 4px;">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Login to System
+                </button>
+            </form>
+
+            <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; line-height: 2;">
+                <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px;">
+                    <span class="wos-badge wos-badge-danger" style="font-size: 10px;">ADMIN</span>
+                    <span>admin@warehouse.com</span>
+                    <span style="font-family: monospace; color: #94a3b8;">demo123</span>
+                    <span class="wos-badge wos-badge-info" style="font-size: 10px;">MGR</span>
+                    <span>manager@warehouse.com</span>
+                    <span style="font-family: monospace; color: #94a3b8;">demo123</span>
+                    <span class="wos-badge wos-badge-success" style="font-size: 10px;">STAFF</span>
+                    <span>staff@warehouse.com</span>
+                    <span style="font-family: monospace; color: #94a3b8;">demo123</span>
+                    <span style="background:#dbeafe;color:#1e40af;font-size:10px;padding:2px 8px;border-radius:999px;font-weight:600;">DEL</span>
+                    <span>delivery@warehouse.com</span>
+                    <span style="font-family: monospace; color: #94a3b8;">demo123</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

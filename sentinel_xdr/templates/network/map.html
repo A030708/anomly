@@ -1,0 +1,629 @@
+{% extends "base.html" %}
+
+{% block title %}Network Map - {{ platform_name }}{% endblock %}
+{% block page_title %}Network Map{% endblock %}
+{% block breadcrumb %}Network{% endblock %}
+
+{% block extra_css %}
+<style>
+    .topo-canvas-wrap {
+        background: rgba(0,0,0,0.25);
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        overflow: hidden;
+        position: relative;
+        cursor: grab;
+        min-height: 520px;
+    }
+    .topo-canvas-wrap:active { cursor: grabbing; }
+    #topoCanvas { display: block; width: 100%; height: 520px; }
+    .node-info-panel {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 260px;
+        background: rgba(10,14,26,0.92);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 12px;
+        padding: 16px;
+        backdrop-filter: blur(8px);
+        display: none;
+    }
+    .node-info-panel.visible { display: block; }
+    .node-info-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .traffic-dot {
+        position: absolute;
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        pointer-events: none;
+        animation: pulse-dot 0.8s ease-out forwards;
+    }
+    @keyframes pulse-dot {
+        0% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(3); }
+    }
+    .map-legend {
+        position: absolute;
+        bottom: 16px;
+        left: 16px;
+        background: rgba(10,14,26,0.85);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 8px;
+        padding: 10px 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .map-controls {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .map-controls button {
+        width: 32px; height: 32px;
+        background: rgba(10,14,26,0.8);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: var(--text-secondary);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .map-controls button:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .seg-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 14px;
+        text-align: center;
+    }
+    .seg-count { font-size: 22px; font-weight: 700; }
+    .bandwidth-chart-wrap, .protocol-chart-wrap { min-height: 180px; }
+    .traffic-table { font-size: 12px; }
+    .traffic-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 8px 10px; font-weight: 600; }
+    .traffic-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .traffic-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .filter-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; outline: none; }
+    .filter-input:focus { border-color: #00d4ff; }
+    .filter-input::placeholder { color: rgba(255,255,255,0.35); }
+    .filter-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+    .filter-select option { background: #1a2035; }
+    .tab-pill {
+        padding: 9px 18px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-size: 13px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: all 0.2s;
+    }
+    .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+    .tab-pill:hover { color: var(--text-primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .tabs-nav {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Segment Stats -->
+    <div class="col-12">
+        <div class="row g-3">
+            {% set segs = [
+                ('Subnets', stats.subnets or 14, '#00d4ff'),
+                ('Endpoints', stats.endpoints or 52, '#00ff88'),
+                ('Servers', stats.servers or 18, '#a855f7'),
+                ('Net Devices', stats.network_devices or 9, '#ffd700'),
+                ('Active Conns', stats.connections or 267, '#ff6b35'),
+                ('Isolated', stats.isolated or 2, '#ff4757'),
+            ] %}
+            {% for label, value, color in segs %}
+            <div class="col-4 col-md-2">
+                <div class="seg-card">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">{{ label }}</div>
+                    <div class="seg-count" style="color:{{ color }};">{{ value }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="col-12">
+        <div class="tabs-nav">
+            <button class="tab-pill active" data-tab="topology"><i class="fas fa-project-diagram"></i> Topology</button>
+            <button class="tab-pill" data-tab="bandwidth"><i class="fas fa-chart-line"></i> Bandwidth</button>
+            <button class="tab-pill" data-tab="traffic"><i class="fas fa-arrow-right-arrow-left"></i> Traffic</button>
+            <button class="tab-pill" data-tab="segments"><i class="fas fa-layer-group"></i> Segments</button>
+        </div>
+
+        <!-- Topology Tab -->
+        <div class="tab-content active" id="tab-topology">
+            <div class="topo-canvas-wrap" id="topoWrap">
+                <canvas id="topoCanvas"></canvas>
+                <div class="map-controls">
+                    <button onclick="zoomMap(1.2)" title="Zoom In"><i class="fas fa-plus"></i></button>
+                    <button onclick="zoomMap(0.8)" title="Zoom Out"><i class="fas fa-minus"></i></button>
+                    <button onclick="resetView()" title="Reset"><i class="fas fa-expand"></i></button>
+                </div>
+                <div class="map-legend">
+                    <span class="legend-item"><span class="legend-dot" style="background:#00d4ff;"></span> Gateway</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#00ff88;"></span> Endpoint</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#a855f7;"></span> Server</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#ffd700;"></span> Net Device</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#ff4757;"></span> Isolated</span>
+                </div>
+                <div class="node-info-panel" id="nodeInfoPanel">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <span style="font-size:14px;font-weight:600;" id="nodeInfoName">Node</span>
+                        <button onclick="closeNodeInfo()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;">&times;</button>
+                    </div>
+                    <div class="node-info-label">IP Address</div>
+                    <div style="font-size:13px;margin-bottom:8px;" id="nodeInfoIP">-</div>
+                    <div class="node-info-label">Type</div>
+                    <div style="font-size:13px;margin-bottom:8px;" id="nodeInfoType">-</div>
+                    <div class="node-info-label">Status</div>
+                    <div style="font-size:13px;margin-bottom:8px;" id="nodeInfoStatus">-</div>
+                    <div class="node-info-label">Alerts</div>
+                    <div style="font-size:13px;margin-bottom:8px;" id="nodeInfoAlerts">-</div>
+                    <div style="display:flex;gap:6px;margin-top:10px;">
+                        <button class="btn-primary-custom" style="padding:6px 12px;font-size:11px;" onclick="alert('Open node detail view')"><i class="fas fa-eye"></i> View</button>
+                        <button class="btn-primary-custom" style="padding:6px 12px;font-size:11px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;" onclick="alert('Isolate node from network')"><i class="fas fa-ban"></i> Isolate</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bandwidth Tab -->
+        <div class="tab-content" id="tab-bandwidth">
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header"><i class="fas fa-chart-line" style="color:#00d4ff;"></i><span class="card-title">Bandwidth Usage (Last 24h)</span></div>
+                        <div class="card-body">
+                            <div class="bandwidth-chart-wrap"><canvas id="bandwidthChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header"><i class="fas fa-chart-pie" style="color:#ffd700;"></i><span class="card-title">Protocol Distribution</span></div>
+                        <div class="card-body">
+                            <div class="protocol-chart-wrap"><canvas id="protocolChart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="card mt-3">
+                        <div class="card-header"><i class="fas fa-circle-info" style="color:#a855f7;"></i><span class="card-title">Top Talkers</span></div>
+                        <div class="card-body" style="padding:12px;">
+                            {% set talkers = [
+                                ('SRV-PROD-01', '1.42 Gbps', '#00d4ff'),
+                                ('SRV-DB-03', '876 Mbps', '#00ff88'),
+                                ('GW-MAIN-01', '654 Mbps', '#a855f7'),
+                                ('SRV-WEB-02', '412 Mbps', '#ffd700'),
+                                ('WS-BOLT-12', '198 Mbps', '#ff6b35'),
+                            ] %}
+                            {% for name, bw, color in talkers %}
+                            <div style="display:flex;justify-content:space-between;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;">
+                                <span style="color:{{ color }};">{{ name }}</span>
+                                <span style="color:var(--text-secondary);">{{ bw }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Traffic Tab -->
+        <div class="tab-content" id="tab-traffic">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-arrow-right-arrow-left" style="color:#00ff88;"></i><span class="card-title">Active Traffic</span>
+                    <div class="d-flex gap-2 ms-auto">
+                        <input class="filter-input" type="text" placeholder="Search IP or port..." style="padding:4px 10px;font-size:11px;" id="trafficSearch" oninput="filterTraffic()">
+                        <select class="filter-select" id="protoFilter" style="padding:4px 10px;font-size:11px;" onchange="filterTraffic()">
+                            <option value="all">All Protocols</option>
+                            <option value="TCP">TCP</option>
+                            <option value="UDP">UDP</option>
+                            <option value="ICMP">ICMP</option>
+                            <option value="HTTP">HTTP</option>
+                            <option value="HTTPS">HTTPS</option>
+                            <option value="DNS">DNS</option>
+                        </select>
+                        <button class="btn-primary-custom" style="padding:4px 10px;font-size:11px;" onclick="alert('Export traffic data')"><i class="fas fa-download"></i></button>
+                    </div>
+                </div>
+                <div style="max-height:400px;overflow-y:auto;">
+                    <table class="traffic-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Dest</th>
+                                <th>Proto</th>
+                                <th>Port</th>
+                                <th>Bytes</th>
+                                <th>Duration</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trafficBody">
+                            {% set flows = [
+                                ('10.0.1.15', '10.0.2.10', 'HTTPS', 443, '1.2 GB', '12m 34s', 'active'),
+                                ('10.0.1.22', '10.0.3.5', 'DNS', 53, '45 MB', '8m 12s', 'active'),
+                                ('10.0.2.10', '10.0.4.1', 'TCP', 3306, '890 MB', '23m 08s', 'active'),
+                                ('10.0.1.5', '10.0.5.2', 'HTTP', 8080, '234 MB', '5m 44s', 'idle'),
+                                ('10.0.3.1', '10.0.1.1', 'ICMP', 0, '12 MB', '1h 02m', 'active'),
+                                ('10.0.4.5', '10.0.2.22', 'HTTPS', 443, '3.1 GB', '45m 10s', 'active'),
+                                ('10.0.1.12', '10.0.6.3', 'UDP', 514, '67 MB', '2m 30s', 'active'),
+                                ('10.0.7.1', '10.0.1.1', 'TCP', 22, '156 MB', '18m 55s', 'active'),
+                                ('10.0.2.5', '10.0.3.10', 'HTTPS', 8443, '2.4 GB', '1h 12m', 'active'),
+                                ('10.0.1.8', '10.0.5.1', 'DNS', 53, '28 MB', '3m 18s', 'idle'),
+                            ] %}
+                            {% for src, dst, proto, port, bytes, dur, status in flows %}
+                            <tr class="traffic-row" data-proto="{{ proto }}">
+                                <td><span style="color:#00d4ff;">{{ src }}</span></td>
+                                <td><span style="color:#a855f7;">{{ dst }}</span></td>
+                                <td><span style="color:{% if proto in ('HTTPS','HTTP') %}#00ff88{% elif proto == 'DNS' %}#ffd700{% else %}#ff6b35{% endif %};">{{ proto }}</span></td>
+                                <td style="color:var(--text-muted);">{{ port }}</td>
+                                <td style="font-family:monospace;color:var(--text-secondary);">{{ bytes }}</td>
+                                <td style="color:var(--text-muted);">{{ dur }}</td>
+                                <td><span style="padding:2px 6px;border-radius:4px;font-size:10px;background:{% if status == 'active' %}rgba(0,255,136,0.15);color:#00ff88{% else %}rgba(100,116,139,0.15);color:#64748b{% endif %};">{{ status|upper }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Segments Tab -->
+        <div class="tab-content" id="tab-segments">
+            <div class="row g-4">
+                {% set segments = [
+                    ('10.0.1.0/24', 'Corporate LAN', 24, 18, '#00d4ff', 'Production workstations, office devices'),
+                    ('10.0.2.0/24', 'Server Farm', 16, 14, '#a855f7', 'Web servers, app servers, load balancers'),
+                    ('10.0.3.0/24', 'Database Tier', 8, 8, '#ffd700', 'PostgreSQL, MySQL, Redis clusters'),
+                    ('10.0.4.0/24', 'DMZ', 10, 6, '#ff6b35', 'Public-facing services, WAF, reverse proxy'),
+                    ('10.0.5.0/24', 'Management', 6, 4, '#00ff88', 'Jump boxes, monitoring, orchestration'),
+                    ('10.0.6.0/24', 'Storage/Backup', 8, 5, '#00d4ff', 'NAS, SAN, backup infrastructure'),
+                    ('10.0.7.0/24', 'VOIP/Media', 4, 3, '#a855f7', 'Voice, video conferencing, streaming'),
+                    ('192.168.1.0/24', 'Warehouse IoT', 15, 12, '#ff4757', 'IoT sensors, scanners, industrial control'),
+                ] %}
+                {% for cidr, name, total, online, color, desc in segments %}
+                <div class="col-md-6 col-lg-3">
+                    <div class="card" style="cursor:pointer;" onclick="alert('Show segment detail for {{ name }}')">
+                        <div class="card-body" style="padding:14px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <span style="font-size:13px;font-weight:600;">{{ name }}</span>
+                                <span style="padding:2px 6px;background:{{ color }}22;border:1px solid {{ color }}44;border-radius:4px;font-size:10px;color:{{ color }};">{{ cidr }}</span>
+                            </div>
+                            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">{{ desc }}</div>
+                            <div style="display:flex;gap:12px;font-size:12px;">
+                                <span style="color:var(--text-secondary);">Devices: <strong style="color:{{ color }};">{{ total }}</strong></span>
+                                <span style="color:#00ff88;">Online: <strong>{{ online }}</strong></span>
+                            </div>
+                            <div style="margin-top:8px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+                                <div style="height:100%;width:{{ (online / total * 100)|int }}%;background:{{ color }};border-radius:2px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ============================================================
+// Topology Canvas
+// ============================================================
+const canvas = document.getElementById('topoCanvas');
+const ctx = canvas.getContext('2d');
+let scale = 1, offsetX = 0, offsetY = 0;
+let isDragging = false, dragStartX, dragStartY;
+let selectedNode = null;
+let animFrame = null;
+
+function resizeCanvas() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const nodes = [
+    { id: 'gw', label: 'GW-MAIN-01', ip: '10.0.0.1', type: 'Gateway', status: 'Online', alerts: 0, color: '#00d4ff', x: 400, y: 60 },
+    { id: 'fw', label: 'FW-PERIM-01', ip: '10.0.0.2', type: 'Firewall', status: 'Online', alerts: 2, color: '#ffd700', x: 150, y: 160 },
+    { id: 'lb', label: 'LB-WEB-01', ip: '10.0.2.1', type: 'Load Balancer', status: 'Online', alerts: 0, color: '#ffd700', x: 650, y: 160 },
+    { id: 'ws1', label: 'WS-BOLT-12', ip: '10.0.1.12', type: 'Endpoint', status: 'Online', alerts: 1, color: '#00ff88', x: 80, y: 320 },
+    { id: 'ws2', label: 'WS-BOLT-15', ip: '10.0.1.15', type: 'Endpoint', status: 'Online', alerts: 0, color: '#00ff88', x: 220, y: 360 },
+    { id: 'ws3', label: 'WS-WH-05', ip: '10.0.1.5', type: 'Endpoint', status: 'Isolated', alerts: 3, color: '#ff4757', x: 120, y: 440 },
+    { id: 'srv1', label: 'SRV-PROD-01', ip: '10.0.2.10', type: 'Server', status: 'Online', alerts: 0, color: '#a855f7', x: 520, y: 300 },
+    { id: 'srv2', label: 'SRV-DB-03', ip: '10.0.3.3', type: 'Server', status: 'Online', alerts: 0, color: '#a855f7', x: 680, y: 340 },
+    { id: 'srv3', label: 'SRV-WEB-02', ip: '10.0.2.22', type: 'Server', status: 'Online', alerts: 1, color: '#a855f7', x: 580, y: 420 },
+    { id: 'iot1', label: 'IOT-SENSOR-01', ip: '192.168.1.10', type: 'IoT', status: 'Online', alerts: 0, color: '#ff6b35', x: 350, y: 480 },
+    { id: 'iot2', label: 'IOT-SENSOR-05', ip: '192.168.1.14', type: 'IoT', status: 'Online', alerts: 0, color: '#ff6b35', x: 460, y: 500 },
+];
+
+const edges = [
+    { from: 'gw', to: 'fw' }, { from: 'gw', to: 'lb' },
+    { from: 'fw', to: 'ws1' }, { from: 'fw', to: 'ws2' }, { from: 'fw', to: 'ws3' },
+    { from: 'lb', to: 'srv1' }, { from: 'lb', to: 'srv2' }, { from: 'lb', to: 'srv3' },
+    { from: 'srv1', to: 'srv2' }, { from: 'srv1', to: 'srv3' },
+    { from: 'ws1', to: 'iot1' }, { from: 'ws2', to: 'iot2' },
+];
+
+let activeFlows = [];
+const flowColors = ['#00ff88', '#00d4ff', '#ffd700', '#a855f7'];
+
+function generateFlows() {
+    activeFlows = [];
+    for (let i = 0; i < 6; i++) {
+        const e = edges[Math.floor(Math.random() * edges.length)];
+        const from = nodes.find(n => n.id === e.from);
+        const to = nodes.find(n => n.id === e.to);
+        if (from && to) {
+            activeFlows.push({
+                from: from, to: to,
+                progress: Math.random(),
+                speed: 0.002 + Math.random() * 0.006,
+                color: flowColors[i % flowColors.length],
+            });
+        }
+    }
+}
+generateFlows();
+
+function drawTopology() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+
+    // Edges
+    edges.forEach(e => {
+        const from = nodes.find(n => n.id === e.from);
+        const to = nodes.find(n => n.id === e.to);
+        if (!from || !to) return;
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    });
+
+    // Flows
+    activeFlows.forEach(f => {
+        f.progress += f.speed;
+        if (f.progress > 1) f.progress = 0;
+        const x = f.from.x + (f.to.x - f.from.x) * f.progress;
+        const y = f.from.y + (f.to.y - f.from.y) * f.progress;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = f.color;
+        ctx.shadowColor = f.color;
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+
+    // Nodes
+    nodes.forEach(n => {
+        const isSelected = selectedNode && selectedNode.id === n.id;
+        const radius = isSelected ? 22 : 18;
+
+        // Glow
+        if (isSelected) {
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, radius + 6, 0, Math.PI * 2);
+            ctx.fillStyle = n.color + '33';
+            ctx.fill();
+        }
+
+        // Circle
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+        const grad = ctx.createRadialGradient(n.x - 4, n.y - 4, 2, n.x, n.y, radius);
+        grad.addColorStop(0, n.color + 'aa');
+        grad.addColorStop(1, n.color + '44');
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = isSelected ? '#fff' : n.color + '88';
+        ctx.lineWidth = isSelected ? 2 : 1.5;
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = isSelected ? '#fff' : 'rgba(255,255,255,0.7)';
+        ctx.font = '11px "Inter", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(n.label, n.x, n.y + radius + 16);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.font = '9px monospace';
+        ctx.fillText(n.ip, n.x, n.y + radius + 30);
+    });
+
+    ctx.restore();
+}
+
+function animateTopology() {
+    drawTopology();
+    animFrame = requestAnimationFrame(animateTopology);
+}
+animateTopology();
+
+// Pan / Zoom
+canvas.addEventListener('mousedown', e => {
+    isDragging = true;
+    dragStartX = e.clientX - offsetX;
+    dragStartY = e.clientY - offsetY;
+});
+canvas.addEventListener('mousemove', e => {
+    if (isDragging) {
+        offsetX = e.clientX - dragStartX;
+        offsetY = e.clientY - dragStartY;
+    }
+});
+canvas.addEventListener('mouseup', e => {
+    isDragging = false;
+    // Check node click
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left - offsetX) / scale;
+    const my = (e.clientY - rect.top - offsetY) / scale;
+    let hit = null;
+    for (const n of nodes) {
+        const dx = mx - n.x, dy = my - n.y;
+        if (dx * dx + dy * dy < 400) { hit = n; break; }
+    }
+    if (hit) {
+        selectedNode = hit;
+        showNodeInfo(hit);
+    } else {
+        selectedNode = null;
+        closeNodeInfo();
+    }
+});
+canvas.addEventListener('mouseleave', () => { isDragging = false; });
+canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const z = e.deltaY > 0 ? 0.9 : 1.1;
+    scale *= z;
+    scale = Math.min(3, Math.max(0.3, scale));
+}, { passive: false });
+
+function zoomMap(factor) {
+    scale *= factor;
+    scale = Math.min(3, Math.max(0.3, scale));
+}
+function resetView() {
+    scale = 1; offsetX = 0; offsetY = 0;
+    selectedNode = null;
+    closeNodeInfo();
+}
+
+function showNodeInfo(node) {
+    document.getElementById('nodeInfoName').textContent = node.label;
+    document.getElementById('nodeInfoIP').textContent = node.ip;
+    document.getElementById('nodeInfoType').textContent = node.type;
+    document.getElementById('nodeInfoStatus').textContent = node.status;
+    document.getElementById('nodeInfoStatus').style.color = node.status === 'Isolated' ? '#ff4757' : '#00ff88';
+    document.getElementById('nodeInfoAlerts').textContent = node.alerts;
+    document.getElementById('nodeInfoAlerts').style.color = node.alerts > 0 ? '#ff4757' : 'var(--text-muted)';
+    document.getElementById('nodeInfoPanel').classList.add('visible');
+}
+function closeNodeInfo() {
+    document.getElementById('nodeInfoPanel').classList.remove('visible');
+}
+
+// ============================================================
+// Tab switching
+// ============================================================
+document.querySelectorAll('.tab-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        if (btn.dataset.tab === 'bandwidth') initBandwidthCharts();
+    });
+});
+
+// ============================================================
+// Traffic filter
+// ============================================================
+function filterTraffic() {
+    const search = document.getElementById('trafficSearch').value.toLowerCase();
+    const proto = document.getElementById('protoFilter').value;
+    document.querySelectorAll('.traffic-row').forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const rowProto = row.dataset.proto;
+        const matchSearch = !search || text.includes(search);
+        const matchProto = proto === 'all' || rowProto === proto;
+        row.style.display = matchSearch && matchProto ? '' : 'none';
+    });
+}
+
+// ============================================================
+// Charts (lazy init)
+// ============================================================
+let chartsInitialized = false;
+let bwChart = null, protoChart = null;
+
+function initBandwidthCharts() {
+    if (chartsInitialized) return;
+
+    // Bandwidth line chart
+    const bwCtx = document.getElementById('bandwidthChart');
+    if (!bwCtx) return;
+    const hours = Array.from({length: 24}, (_, i) => i + ':00');
+    const inbound = [420, 380, 450, 390, 410, 480, 520, 610, 780, 920, 1100, 1240, 1180, 1050, 960, 1020, 1150, 1280, 1350, 1420, 1380, 1200, 980, 760];
+    const outbound = [310, 290, 340, 310, 330, 370, 410, 480, 590, 680, 790, 860, 820, 750, 700, 740, 830, 920, 970, 1010, 980, 870, 720, 560];
+
+    bwChart = new Chart(bwCtx, {
+        type: 'line',
+        data: {
+            labels: hours,
+            datasets: [
+                { label: 'Inbound (Mbps)', data: inbound, borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.05)', fill: true, tension: 0.3, pointRadius: 2 },
+                { label: 'Outbound (Mbps)', data: outbound, borderColor: '#00ff88', backgroundColor: 'rgba(0,255,136,0.05)', fill: true, tension: 0.3, pointRadius: 2 },
+            ],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+            scales: {
+                x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            },
+        },
+    });
+
+    // Protocol donut chart
+    const protoCtx = document.getElementById('protocolChart');
+    if (!protoCtx) return;
+    protoChart = new Chart(protoCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['HTTPS', 'DNS', 'TCP', 'UDP', 'HTTP', 'ICMP'],
+            datasets: [{
+                data: [42, 18, 16, 12, 8, 4],
+                backgroundColor: ['#00d4ff', '#ffd700', '#a855f7', '#00ff88', '#ff6b35', '#64748b'],
+                borderWidth: 0,
+            }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#94a3b8', font: { size: 10 }, padding: 12, usePointStyle: true },
+                },
+            },
+        },
+    });
+
+    chartsInitialized = true;
+}
+</script>
+{% endblock %}

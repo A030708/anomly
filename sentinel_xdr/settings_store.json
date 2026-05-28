@@ -1,0 +1,14 @@
+{
+  "platform_name": "abhiram",
+  "timezone": "Asia/Kolkata",
+  "date_format": "YYYY-MM-DD",
+  "retention_period": "90 days",
+  "session_timeout": "1",
+  "max_login_attempts": "5",
+  "password_policy": "Enhanced",
+  "event_collection": true,
+  "network_flow_collection": true,
+  "endpoint_telemetry": true,
+  "threat_intel_feeds": false,
+  "ml_anomaly_detection": true
+}

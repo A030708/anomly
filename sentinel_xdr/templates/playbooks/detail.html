@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}{{ playbook.name }} - {{ platform_name }}{% endblock %}
+{% block page_title %}{{ playbook.name }}{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('playbooks.list_playbooks') }}" style="color:#00d4ff;text-decoration:none;">Playbooks</a> / {{ playbook.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .step-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; transition: all 0.2s; }
+    .step-card:hover { background: rgba(255,255,255,0.05); }
+    .step-connector { width: 2px; height: 20px; background: rgba(255,255,255,0.08); margin-left: 21px; }
+    .filter-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+    .filter-select option { background: #1a2035; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <!-- Playbook Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-book-open" style="color:#00d4ff;"></i>
+                <span class="card-title">{{ playbook.name }}</span>
+                <span class="status-badge status-{{ playbook.status|lower }}">{{ playbook.status }}</span>
+                <span style="padding:2px 8px;background:rgba(0,212,255,0.1);border-radius:4px;font-size:10px;color:#00d4ff;">v{{ playbook.version or '1.0' }}</span>
+            </div>
+            <div class="card-body">
+                <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;">{{ playbook.description or 'No description provided.' }}</p>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:16px;">
+                    {% set fields = [('Category', playbook.category or 'Response'), ('Severity', playbook.severity or 'All'), ('Owner', playbook.owner or 'Unassigned'), ('Created', playbook.created_at.strftime('%Y-%m-%d') if playbook.created_at else 'N/A'), ('Last Run', playbook.last_run.strftime('%Y-%m-%d %H:%M') if playbook.last_run else 'Never'), ('Success Rate', (playbook.success_rate|string ~ '%') if playbook.success_rate else 'N/A')] %}
+                    {% for label, value in fields %}
+                    <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:10px;">
+                        <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">{{ label }}</div>
+                        <div style="font-size:12px;font-weight:500;">{{ value }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-list-ol" style="color:#ffd700;"></i>
+                <span class="card-title">Playbook Steps ({{ steps|length }})</span>
+                <a href="{{ url_for('playbooks.run_playbook', playbook_id=playbook.id) }}" class="btn-primary-custom ms-auto" style="padding:6px 14px;font-size:12px;">
+                    <i class="fas fa-play"></i> Run Playbook
+                </a>
+            </div>
+            <div class="card-body">
+                {% if steps %}
+                    {% for step in steps %}
+                    <div class="step-card">
+                        <div class="d-flex align-items-start gap-3">
+                            <div class="step-badge" style="background:{{ 'rgba(0,212,255,0.15)' if step.type == 'automated' else 'rgba(255,215,0,0.15)' }};color:{{ '#00d4ff' if step.type == 'automated' else '#ffd700' }};">
+                                {{ loop.index }}
+                            </div>
+                            <div style="flex:1;">
+                                <div style="font-size:13px;font-weight:600;color:var(--text-primary);">{{ step.name }}</div>
+                                <div style="font-size:11px;color:var(--text-muted);">{{ step.description }}</div>
+                                <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;display:flex;gap:12px;">
+                                    <span><i class="fas fa-{{ 'robot' if step.type == 'automated' else 'user' }}"></i> {{ step.type|title }}</span>
+                                    {% if step.expected_duration %}<span><i class="fas fa-clock"></i> ~{{ step.expected_duration }}</span>{% endif %}
+                                </div>
+                            </div>
+                            <span class="status-badge status-{{ step.status|lower }}">{{ step.status }}</span>
+                        </div>
+                    </div>
+                    {% if not loop.last %}<div class="step-connector"></div>{% endif %}
+                    {% endfor %}
+                {% else %}
+                <div class="empty-state"><i class="fas fa-list-ol"></i><p>No steps defined</p></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Actions -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="fas fa-bolt" style="color:#ffd700;"></i><span class="card-title">Actions</span></div>
+            <div class="card-body d-grid gap-2">
+                <a href="{{ url_for('playbooks.run_playbook', playbook_id=playbook.id) }}" class="btn-primary-custom justify-content-center"><i class="fas fa-play"></i> Run Now</a>
+                <a href="{{ url_for('playbooks.edit_playbook', playbook_id=playbook.id) }}" class="btn-primary-custom justify-content-center" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;"><i class="fas fa-pen"></i> Edit</a>
+                <a href="{{ url_for('playbooks.export_playbook', playbook_id=playbook.id) }}" class="btn-primary-custom justify-content-center" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);"><i class="fas fa-file-export"></i> Export</a>
+            </div>
+        </div>
+        <!-- Run History -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="fas fa-clock-rotate-left" style="color:#00d4ff;"></i><span class="card-title">Recent Runs</span></div>
+            <div class="card-body" style="padding:12px;">
+                {% if recent_runs %}
+                    {% for run in recent_runs %}
+                    <div style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);">
+                        <span class="status-badge status-{{ run.status|lower }}" style="font-size:8px;">{{ run.status }}</span>
+                        <div style="flex:1;font-size:11px;color:var(--text-secondary);">{{ run.started_at.strftime('%H:%M %d/%m') if run.started_at else 'N/A' }}</div>
+                        <span style="font-size:10px;color:var(--text-muted);">{{ run.duration or '—' }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state" style="padding:16px;"><i class="fas fa-clock"></i><p style="font-size:12px;">No runs yet</p></div>
+                {% endif %}
+            </div>
+        </div>
+        <!-- Related Incidents -->
+        <div class="card">
+            <div class="card-header"><i class="fas fa-fire" style="color:#ff6b35;"></i><span class="card-title">Related Incidents</span></div>
+            <div class="card-body" style="padding:12px;">
+                {% if related_incidents %}
+                    {% for inc in related_incidents %}
+                    <a href="{{ url_for('incidents.incident_detail', incident_id=inc.id) }}" style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);text-decoration:none;">
+                        <span class="severity-badge severity-{{ inc.severity|lower }}">{{ inc.severity }}</span>
+                        <div style="flex:1;font-size:12px;color:var(--text-primary);">{{ inc.title[:30] }}{% if inc.title|length > 30 %}...{% endif %}</div>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state" style="padding:16px;"><i class="fas fa-fire"></i><p style="font-size:12px;">No related incidents</p></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

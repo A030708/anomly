@@ -1,0 +1,524 @@
+{% extends "base.html" %}
+
+{% block title %}Threat Hunting - {{ platform_name }}{% endblock %}
+{% block page_title %}Threat Hunting{% endblock %}
+{% block breadcrumb %}Hunt{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hunt-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; height: 100%; transition: all 0.2s; }
+    .hunt-card:hover { background: var(--bg-card-hover); border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+    .filter-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; outline: none; }
+    .filter-input:focus { border-color: #00d4ff; }
+    .filter-input::placeholder { color: rgba(255,255,255,0.35); }
+    .filter-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+    .filter-select option { background: #1a2035; }
+    .tabs-nav {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.07);
+        flex-wrap: wrap;
+    }
+    .tab-pill {
+        padding: 9px 18px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-size: 13px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: all 0.2s;
+    }
+    .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+    .tab-pill:hover { color: var(--text-primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .query-editor { background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 14px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.6; color: #e2e8f0; min-height: 160px; outline: none; width: 100%; resize: vertical; tab-size: 2; }
+    .query-editor:focus { border-color: #00d4ff; }
+    .query-editor::placeholder { color: rgba(255,255,255,0.2); }
+    .line-numbers {
+        background: rgba(0,0,0,0.2);
+        color: rgba(255,255,255,0.2);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        padding: 14px 10px;
+        text-align: right;
+        user-select: none;
+        min-height: 160px;
+        border-radius: 8px 0 0 8px;
+        border-right: 1px solid rgba(255,255,255,0.06);
+    }
+    .template-item {
+        padding: 10px 12px;
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 8px;
+        margin-bottom: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 12px;
+    }
+    .template-item:hover { background: rgba(0,212,255,0.06); border-color: rgba(0,212,255,0.2); }
+    .template-item .template-name { font-weight: 600; color: var(--text-primary); }
+    .template-item .template-desc { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .hypothesis-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+    }
+    .hypothesis-card:hover { border-color: rgba(0,212,255,0.2); }
+    .hypothesis-card.active-hunt { border-color: rgba(0,255,136,0.3); border-left: 3px solid #00ff88; }
+    .hypothesis-card.completed-hunt { border-color: rgba(100,116,139,0.2); opacity: 0.7; }
+    .ttp-chip {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 9px;
+        font-weight: 700;
+        font-family: monospace;
+        display: inline-block;
+    }
+    .coverage-bar-wrap { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+    .coverage-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+    .history-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+        font-size: 12px;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .finding-severity { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    .finding-critical { background:rgba(255,71,87,0.15); color:#ff4757; }
+    .finding-high     { background:rgba(255,107,53,0.15); color:#ff6b35; }
+    .finding-medium   { background:rgba(255,215,0,0.15);  color:#ffd700; }
+    .finding-low      { background:rgba(0,212,255,0.12);  color:#00d4ff; }
+    .data-source-chip {
+        padding: 5px 10px;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 11px;
+        transition: all 0.2s;
+        user-select: none;
+    }
+    .data-source-chip.selected { border-color: #00d4ff; background: rgba(0,212,255,0.08); color: #00d4ff; }
+    .schedule-btn { padding: 4px 10px; font-size: 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); border-radius: 6px; cursor: pointer; }
+    .schedule-btn:hover { background: rgba(255,255,255,0.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tabs-nav">
+    <button class="tab-pill active" data-tab="query"><i class="fas fa-terminal"></i> Query Builder</button>
+    <button class="tab-pill" data-tab="hypotheses"><i class="fas fa-flask"></i> Hypotheses</button>
+    <button class="tab-pill" data-tab="history"><i class="fas fa-clock-rotate-left"></i> Hunt History</button>
+    <button class="tab-pill" data-tab="findings"><i class="fas fa-bug"></i> Findings</button>
+</div>
+
+<!-- ==================== QUERY BUILDER TAB ==================== -->
+<div class="tab-content active" id="tab-query">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-terminal" style="color:#00d4ff;"></i><span class="card-title">Hunt Query</span>
+                    <div class="d-flex gap-2 ms-auto">
+                        <select class="filter-select" id="timeRange" style="padding:4px 10px;font-size:11px;">
+                            <option value="1h">Last Hour</option>
+                            <option value="24h" selected>Last 24 Hours</option>
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                        <button class="schedule-btn" onclick="scheduleHunt()"><i class="fas fa-clock"></i> Schedule</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="display:flex;gap:0;margin-bottom:10px;">
+                        <div class="line-numbers" id="lineNumbers">1<br>2<br>3<br>4<br>5<br>6<br>7</div>
+                        <textarea class="query-editor" id="queryEditor" placeholder="Enter KQL or Sigma query..." oninput="updateLineNumbers()" style="border-radius:0 8px 8px 0;">EventType:ProcessCreate
+| where Image contains "powershell"
+| where CommandLine contains "-enc" or CommandLine contains "IEX"
+| project TimeGenerated, Computer, UserName, CommandLine, ParentProcess
+| take 100</textarea>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+                        <span style="font-size:11px;color:var(--text-muted);">Data Sources:</span>
+                        <span class="data-source-chip selected" onclick="toggleSource(this)"><i class="fas fa-database"></i> Events</span>
+                        <span class="data-source-chip selected" onclick="toggleSource(this)"><i class="fas fa-bell"></i> Alerts</span>
+                        <span class="data-source-chip" onclick="toggleSource(this)"><i class="fas fa-network-wired"></i> Network</span>
+                        <span class="data-source-chip" onclick="toggleSource(this)"><i class="fas fa-desktop"></i> Endpoint</span>
+                        <span class="data-source-chip" onclick="toggleSource(this)"><i class="fas fa-cloud"></i> Cloud</span>
+                        <span class="data-source-chip" onclick="toggleSource(this)"><i class="fas fa-shield"></i> Identity</span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn-primary-custom" onclick="runHuntQuery()"><i class="fas fa-play"></i> Run Query</button>
+                        <button class="btn-primary-custom" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;" onclick="saveHuntQuery()"><i class="fas fa-bookmark"></i> Save</button>
+                        <button class="btn-primary-custom" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);" onclick="clearHuntQuery()"><i class="fas fa-eraser"></i> Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <i class="fas fa-table-list" style="color:#00ff88;"></i><span class="card-title">Hunt Results</span>
+                    <span style="font-size:12px;color:var(--text-muted);" id="resultCount">0 results</span>
+                    <div class="ms-auto d-flex gap-2">
+                        <button class="btn-primary-custom" style="padding:4px 10px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);" onclick="createDetectionRule()"><i class="fas fa-shield"></i> Create Rule</button>
+                        <button class="btn-primary-custom" style="padding:4px 10px;font-size:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);" onclick="exportResults()"><i class="fas fa-download"></i> Export</button>
+                    </div>
+                </div>
+                <div id="huntResults" style="max-height:420px;overflow-y:auto;">
+                    <div class="empty-state" style="padding:40px;">
+                        <i class="fas fa-magnifying-glass-chart"></i>
+                        <p>Run a query to see results</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Query Templates -->
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-file-code" style="color:#ffd700;"></i><span class="card-title">Query Templates</span></div>
+                <div class="card-body" style="padding:12px;">
+                    {% set templates = [
+                        ('Powershell Encoded Command', 'Detect base64-encoded PowerShell commands', 'EventType:ProcessCreate AND Image:*powershell* AND CommandLine:*IEX*'),
+                        ('Scheduled Task Creation', 'Detect schtasks.exe creating malicious tasks', 'EventType:ProcessCreate AND Image:*schtasks*'),
+                        ('RDP Brute Force', 'Multiple failed RDP logins from single source', 'EventType:LogonFailed AND LogonType:10'),
+                        ('Data Exfiltration', 'Large outbound transfers to unusual dest', 'EventType:NetworkConnection AND BytesOut > 1000000'),
+                        ('Lateral Movement', 'Remote service creation or WMI', 'EventType:ProcessCreate AND Image:*wmiprvse*'),
+                        ('Service Installation', 'New service installed via sc.exe', 'EventType:ServiceCreate AND Image:*sc.exe*'),
+                    ] %}
+                    {% for name, desc, query in templates %}
+                    <div class="template-item" onclick="loadTemplate({{ loop.index0 }})">
+                        <div class="template-name">{{ name }}</div>
+                        <div class="template-desc">{{ desc }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Hunts Overview -->
+            <div class="card">
+                <div class="card-header"><i class="fas fa-chart-simple" style="color:#00d4ff;"></i><span class="card-title">Hunt Overview</span></div>
+                <div class="card-body">
+                    {% set hunt_stats = [
+                        ('Queries Run', stats.queries_run or 47, '#00d4ff'),
+                        ('Hits Found', stats.hits_found or 183, '#ff4757'),
+                        ('Saved Queries', stats.saved_queries or 15, '#00ff88'),
+                        ('Active Hunts', stats.active_hunts or 6, '#a855f7'),
+                        ('Avg Response', stats.avg_response or '0.9s', '#ffd700'),
+                    ] %}
+                    {% for label, value, color in hunt_stats %}
+                    <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                        <span style="font-size:12px;color:var(--text-muted);">{{ label }}</span>
+                        <span style="font-size:13px;font-weight:600;color:{{ color }};">{{ value }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== HYPOTHESES TAB ==================== -->
+<div class="tab-content" id="tab-hypotheses">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div style="font-size:13px;color:var(--text-muted);">Investigate threats by forming and testing hypotheses</div>
+        <div class="d-flex gap-2">
+            <button class="btn-primary-custom" onclick="alert('Create new hypothesis')"><i class="fas fa-plus"></i> New Hypothesis</button>
+            <select class="filter-select" style="padding:4px 10px;font-size:11px;">
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="draft">Draft</option>
+            </select>
+        </div>
+    </div>
+
+    {% set hypotheses = [
+        ('APT-C-36 Ingress via Phishing', 'Threat actor APT-C-36 may have gained initial access through spear-phishing emails targeting finance department', 'active', 78, '2026-05-22', ['T1566','T1204','T1059']),
+        ('Lateral Movement to DB Tier', 'Initial compromise on corporate LAN may be spreading toward database servers via pass-the-hash', 'active', 45, '2026-05-21', ['T1550','T1021','T1078']),
+        ('Cryptominer Deployment', 'Unexpected CPU spikes on web servers may indicate cryptominer deployment via compromised container', 'active', 62, '2026-05-20', ['T1496','T1204','T1053']),
+        ('Data Exfiltration via DNS', 'Anomalous DNS queries from HR subnet may indicate DNS tunneling for data exfiltration', 'completed', 100, '2026-05-18', ['T1048','T1572','T1071']),
+        ('Supply Chain Compromise', 'Third-party library update in CI/CD pipeline may have introduced backdoored dependency', 'draft', 15, '2026-05-17', ['T1195','T1192','T1053']),
+        ('Ransomware Preparation', 'Unusual volume of file enumeration and shadow copy deletion suggests pre-ransomware activity', 'active', 34, '2026-05-16', ['T1490','T1083','T1486']),
+    ] %}
+
+    {% for title, desc, status, coverage, date, ttps in hypotheses %}
+    <div class="hypothesis-card {% if status == 'active' %}active-hunt{% elif status == 'completed' %}completed-hunt{% endif %}">
+        <div class="d-flex justify-content-between align-items-start">
+            <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span style="font-size:14px;font-weight:600;color:var(--text-primary);">{{ title }}</span>
+                    <span style="padding:2px 8px;border-radius:4px;font-size:9px;text-transform:uppercase;font-weight:700;background:{% if status == 'active' %}rgba(0,255,136,0.15);color:#00ff88{% elif status == 'completed' %}rgba(100,116,139,0.15);color:#64748b{% else %}rgba(255,215,0,0.15);color:#ffd700{% endif %};">{{ status }}</span>
+                </div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">{{ desc }}</div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    {% for ttp in ttps %}
+                    <span class="ttp-chip" style="background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.2);">{{ ttp }}</span>
+                    {% endfor %}
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:4px;">Created {{ date }}</span>
+                </div>
+            </div>
+            <div style="text-align:right;min-width:80px;">
+                <div style="font-size:20px;font-weight:700;color:{% if coverage >= 75 %}#00ff88{% elif coverage >= 40 %}#ffd700{% else %}#ff4757{% endif %};">{{ coverage }}%</div>
+                <div style="font-size:10px;color:var(--text-muted);">Coverage</div>
+            </div>
+        </div>
+        <div class="coverage-bar-wrap">
+            <div class="coverage-bar-fill" style="width:{{ coverage }}%;background:{% if coverage >= 75 %}#00ff88{% elif coverage >= 40 %}#ffd700{% else %}#ff4757{% endif %};"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn-primary-custom" style="padding:4px 10px;font-size:10px;" onclick="alert('Investigate hypothesis')"><i class="fas fa-search"></i> Investigate</button>
+            <button class="btn-primary-custom" style="padding:4px 10px;font-size:10px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;" onclick="alert('Run queries for this hypothesis')"><i class="fas fa-play"></i> Run Queries</button>
+            <button class="btn-primary-custom" style="padding:4px 10px;font-size:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);" onclick="alert('Edit hypothesis')"><i class="fas fa-pen"></i> Edit</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ==================== HUNT HISTORY TAB ==================== -->
+<div class="tab-content" id="tab-history">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div style="font-size:13px;color:var(--text-muted);">Record of all hunting queries executed</div>
+        <div class="d-flex gap-2">
+            <input class="filter-input" type="text" placeholder="Search history..." style="padding:4px 10px;font-size:11px;" id="historySearch" oninput="filterHistory()">
+            <select class="filter-select" style="padding:4px 10px;font-size:11px;" id="historyStatus" onchange="filterHistory()">
+                <option value="all">All</option>
+                <option value="hit">Hits</option>
+                <option value="no_hits">No Hits</option>
+                <option value="error">Error</option>
+            </select>
+        </div>
+    </div>
+    <div class="card">
+        <div style="max-height:600px;overflow-y:auto;">
+            {% set history = [
+                ('Lateral Movement — WMI', '2026-05-23 10:32:18', 'users/admin', '1.2s', 'hit', 8),
+                ('Powershell Encoded Command', '2026-05-23 09:15:42', 'users/admin', '0.8s', 'hit', 3),
+                ('Suspicious Scheduled Tasks', '2026-05-23 08:00:12', 'users/analyst1', '1.5s', 'no_hits', 0),
+                ('RDP Brute Force Detection', '2026-05-22 22:30:05', 'users/analyst1', '0.6s', 'hit', 24),
+                ('DNS Tunneling Detection', '2026-05-22 18:45:33', 'users/admin', '2.1s', 'no_hits', 0),
+                ('New Service Installation', '2026-05-22 15:20:10', 'users/analyst2', '1.0s', 'hit', 2),
+                ('Data Exfiltration — Large Outbound', '2026-05-22 14:00:00', 'users/admin', '1.8s', 'error', 0),
+                ('Registry Persistence Detection', '2026-05-22 11:10:22', 'users/analyst2', '0.9s', 'hit', 5),
+                ('Supply Chain — Suspicious DLL Load', '2026-05-22 09:30:15', 'users/admin', '1.4s', 'no_hits', 0),
+                ('Credential Dumping Detection', '2026-05-21 23:55:40', 'users/analyst1', '1.1s', 'hit', 12),
+            ] %}
+            {% for query_name, ts, user, duration, status, hits in history %}
+            <div class="history-item" data-status="{{ status }}">
+                <div style="flex:1;">
+                    <div style="font-weight:600;font-size:13px;color:var(--text-primary);">{{ query_name }}</div>
+                    <div style="font-size:11px;color:var(--text-muted);">{{ ts }} &middot; {{ user }}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:11px;color:var(--text-secondary);">{{ duration }}</div>
+                    <span style="padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;background:{% if status == 'hit' %}rgba(0,255,136,0.15);color:#00ff88{% elif status == 'no_hits' %}rgba(100,116,139,0.15);color:#64748b{% else %}rgba(255,71,87,0.15);color:#ff4757{% endif %};">{{ status|upper }}</span>
+                </div>
+                <div style="text-align:center;min-width:60px;">
+                    <div style="font-size:18px;font-weight:700;color:#ffd700;">{{ hits }}</div>
+                    <div style="font-size:10px;color:var(--text-muted);">hits</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- ==================== FINDINGS TAB ==================== -->
+<div class="tab-content" id="tab-findings">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div style="font-size:13px;color:var(--text-muted);">Notable findings discovered through hunt operations</div>
+        <div class="d-flex gap-2">
+            <select class="filter-select" style="padding:4px 10px;font-size:11px;">
+                <option value="all">All Severity</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+            </select>
+            <button class="btn-primary-custom" onclick="alert('Acknowledge all findings')"><i class="fas fa-check-double"></i> Ack All</button>
+        </div>
+    </div>
+    <div class="card">
+        <div style="max-height:600px;overflow-y:auto;">
+            <table style="width:100%;font-size:12px;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.06);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Finding</th>
+                        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.06);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Severity</th>
+                        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.06);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Source</th>
+                        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.06);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Affected</th>
+                        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.06);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">MITRE</th>
+                        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.06);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set findings = [
+                        ('Encoded PowerShell on SRV-PROD-01', 'critical', 'Hunt: Encoded Commands', 'SRV-PROD-01', 'T1059', 'New'),
+                        ('WMI Lateral Movement to DB Subnet', 'critical', 'Hunt: Lateral Movement', 'SRV-DB-03, SRV-DB-04', 'T1047', 'Investigating'),
+                        ('Suspicious schtasks on WS-BOLT-12', 'high', 'Hunt: Scheduled Tasks', 'WS-BOLT-12', 'T1053', 'New'),
+                        ('Multiple RDP Failures from 10.0.7.0/24', 'high', 'Hunt: RDP Brute Force', '10.0.7.0/24 (7 hosts)', 'T1110', 'Acknowledged'),
+                        ('Registry Run Key Added on WS-WH-05', 'medium', 'Hunt: Persistence', 'WS-WH-05', 'T1547', 'New'),
+                        ('Unusual Outbound Traffic to Unknown IP', 'medium', 'Hunt: Data Exfiltration', 'SRV-WEB-02', 'T1048', 'Investigating'),
+                        ('Service Install via sc.exe on SRV-ADMIN', 'low', 'Hunt: Service Installation', 'SRV-ADMIN-01', 'T1543', 'Acknowledged'),
+                    ] %}
+                    {% for finding, severity, source, affected, mitre, status in findings %}
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.03);cursor:pointer;" onclick="alert('View finding detail: {{ finding }}')">
+                        <td style="padding:10px 12px;">
+                            <div style="font-weight:600;color:var(--text-primary);">{{ finding }}</div>
+                            <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">{{ source }}</div>
+                        </td>
+                        <td style="padding:10px 12px;"><span class="finding-severity finding-{{ severity }}">{{ severity|upper }}</span></td>
+                        <td style="padding:10px 12px;color:var(--text-secondary);">{{ source.split(':')[1] if ':' in source else source }}</td>
+                        <td style="padding:10px 12px;font-family:monospace;color:#00d4ff;font-size:11px;">{{ affected }}</td>
+                        <td style="padding:10px 12px;"><span class="ttp-chip" style="background:rgba(168,85,247,0.12);color:#a855f7;">{{ mitre }}</span></td>
+                        <td style="padding:10px 12px;">
+                            <span style="padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600;background:{% if status == 'New' %}rgba(0,212,255,0.12);color:#00d4ff{% elif status == 'Investigating' %}rgba(255,215,0,0.12);color:#ffd700{% else %}rgba(100,116,139,0.12);color:#64748b{% endif %};">{{ status }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ============================================================
+// Tab switching
+// ============================================================
+document.querySelectorAll('.tab-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+});
+
+// ============================================================
+// Query editor line numbers
+// ============================================================
+function updateLineNumbers() {
+    const editor = document.getElementById('queryEditor');
+    const lines = editor.value.split('\n').length;
+    const nums = document.getElementById('lineNumbers');
+    nums.innerHTML = Array.from({length: lines}, (_, i) => i + 1).join('<br>');
+}
+
+// ============================================================
+// Data source toggle
+// ============================================================
+function toggleSource(el) {
+    el.classList.toggle('selected');
+}
+
+// ============================================================
+// Template queries (from Jinja context)
+// ============================================================
+const templateQueries = [
+    'EventType:ProcessCreate AND Image:*powershell* AND CommandLine:*IEX*',
+    'EventType:ProcessCreate AND Image:*schtasks*',
+    'EventType:LogonFailed AND LogonType:10',
+    'EventType:NetworkConnection AND BytesOut > 1000000',
+    'EventType:ProcessCreate AND Image:*wmiprvse*',
+    'EventType:ServiceCreate AND Image:*sc.exe*',
+];
+
+function loadTemplate(index) {
+    document.getElementById('queryEditor').value = templateQueries[index] || '';
+    updateLineNumbers();
+}
+
+// ============================================================
+// Hunt query execution
+// ============================================================
+function runHuntQuery() {
+    const query = document.getElementById('queryEditor').value;
+    const results = document.getElementById('huntResults');
+    if (!query.trim()) { alert('Enter a query'); return; }
+
+    results.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);"><i class="fas fa-spinner fa-spin" style="font-size:24px;margin-bottom:8px;"></i><p>Executing query...</p></div>';
+
+    setTimeout(() => {
+        const sample = [
+            { ts: '2026-05-23 10:15:22', comp: 'SRV-PROD-01', user: 'svc_backup', cmd: 'powershell -enc SQBFAFgA...', pid: '4521', type: 'ProcessCreate' },
+            { ts: '2026-05-23 10:12:08', comp: 'WS-BOLT-12', user: 'admin', cmd: 'wmic process call create calc.exe', pid: '3289', type: 'ProcessCreate' },
+            { ts: '2026-05-23 09:58:44', comp: 'SRV-DB-03', user: 'SYSTEM', cmd: 'schtasks /create /tn Updater /tr "c:\\\\malware.exe"', pid: '2104', type: 'ProcessCreate' },
+            { ts: '2026-05-23 09:30:12', comp: 'WS-WH-05', user: 'jdoe', cmd: 'reg add HKLM\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run /v Backdoor', pid: '1567', type: 'RegistryEvent' },
+        ];
+
+        let html = '<div style="font-size:11px;color:var(--text-muted);padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(0,255,136,0.04);">';
+        html += '<i class="fas fa-check-circle" style="color:#00ff88;"></i> Found <strong>' + sample.length + '</strong> results in 0.8s';
+        html += ' &middot; Data sources: Events, Alerts';
+        html += '</div>';
+
+        sample.forEach(r => {
+            html += '<div class="result-row" style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;">';
+            html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">';
+            html += '<span style="color:var(--text-muted);font-size:11px;">' + r.ts + '</span>';
+            html += '<span style="color:#00d4ff;font-weight:600;">' + r.comp + '</span>';
+            html += '<span style="color:#a855f7;">' + r.user + '</span>';
+            html += '<span style="padding:1px 5px;border-radius:3px;font-size:9px;background:rgba(255,255,255,0.06);color:var(--text-muted);">' + r.type + '</span>';
+            html += '<span style="font-family:monospace;color:#ffd700;flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + r.cmd + '</span>';
+            html += '<span style="color:var(--text-muted);font-size:10px;">PID: ' + r.pid + '</span>';
+            html += '</div></div>';
+        });
+
+        results.innerHTML = html;
+        document.getElementById('resultCount').textContent = sample.length + ' results';
+    }, 1000);
+}
+
+function saveHuntQuery() {
+    const name = prompt('Query name:');
+    if (name) alert('Query "' + name + '" saved! (Implement DB persistence)');
+}
+
+function clearHuntQuery() {
+    document.getElementById('queryEditor').value = '';
+    document.getElementById('huntResults').innerHTML = '<div class="empty-state" style="padding:40px;"><i class="fas fa-magnifying-glass-chart"></i><p>Run a query to see results</p></div>';
+    document.getElementById('resultCount').textContent = '0 results';
+    updateLineNumbers();
+}
+
+function scheduleHunt() {
+    alert('Schedule this hunt query to run periodically');
+}
+
+function createDetectionRule() {
+    alert('Create detection rule from hunt results');
+}
+
+function exportResults() {
+    alert('Export hunt results — CSV/JSON/STIX');
+}
+
+// ============================================================
+// History filter
+// ============================================================
+function filterHistory() {
+    const search = document.getElementById('historySearch').value.toLowerCase();
+    const status = document.getElementById('historyStatus').value;
+    document.querySelectorAll('.history-item').forEach(item => {
+        const text = item.textContent.toLowerCase();
+        const itemStatus = item.dataset.status;
+        const matchSearch = !search || text.includes(search);
+        const matchStatus = status === 'all' || itemStatus === status;
+        item.style.display = matchSearch && matchStatus ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+{% block title %}WarehouseOS Dashboard{% endblock %}
+{% block header_title %}Operations Overview{% endblock %}
+{% block content %}
+
+<style>
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .dash-card { background: var(--wos-surface); border-radius: var(--wos-radius-lg); box-shadow: var(--wos-shadow-sm); border: 1px solid var(--wos-border); padding: 20px; display: flex; align-items: center; gap: 16px; }
+  .dash-card-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .dash-card-label { font-size: 12px; color: var(--wos-text-muted); font-weight: 500; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .dash-card-value { font-size: 26px; font-weight: 700; line-height: 1.2; }
+  .dash-section { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .dash-section { grid-template-columns: 1fr; } }
+  .dash-panel { background: var(--wos-surface); border-radius: var(--wos-radius-lg); box-shadow: var(--wos-shadow-sm); border: 1px solid var(--wos-border); padding: 20px; }
+  .dash-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 15px; font-weight: 700; }
+  .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .order-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+  .order-bar-seg { flex: 1; text-align: center; padding: 12px 8px; border-radius: var(--wos-radius-md); font-size: 12px; font-weight: 600; }
+</style>
+
+<!-- ============ ADMIN DASHBOARD ============ -->
+{% if current_user.role == 'admin' %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+  <div>
+    <h1 style="font-size:22px;font-weight:700;margin-bottom:4px;">System Security Dashboard</h1>
+    <p style="color:var(--wos-text-muted);font-size:14px;">IT Administration & Telemetry Overview</p>
+  </div>
+  <span class="wos-badge wos-badge-danger" style="padding:6px 12px;font-size:12px;">ADMIN ACCESS</span>
+</div>
+
+<!-- Fraud Alert Toast Container -->
+<div id="fraud-toast-container" style="position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;"></div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const source = new EventSource("{{ url_for('alerts_stream') }}");
+  const container = document.getElementById("fraud-toast-container");
+  source.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.is_anomalous) {
+      const toast = document.createElement("div");
+      toast.style.cssText = "background:#fff;border-left:4px solid var(--wos-danger);box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);padding:16px;border-radius:4px;width:350px;display:flex;flex-direction:column;gap:8px;";
+      toast.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:var(--wos-danger);"><i class="fa-solid fa-triangle-exclamation"></i> Fraud Alert</strong>
+          <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;cursor:pointer;">&times;</button>
+        </div>
+        <div style="font-size:13px;font-family:monospace;">IP: ${data.ip_address}</div>
+        <div style="font-size:14px;">${data.event_type}</div>
+        <button onclick="stopAttack('${data.ip_address}')" class="wos-btn wos-btn-danger" style="margin-top:8px;font-size:12px;padding:6px;">Stop Attack</button>
+      `;
+      container.appendChild(toast);
+    }
+  };
+  window.stopAttack = function(ip) {
+    fetch("{{ url_for('stop_attack') }}", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ip_address:ip})
+    }).then(r=>r.json()).then(d=>alert(d.message)).catch(e=>console.error(e));
+  };
+});
+</script>
+
+<div class="dash-grid">
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#fee2e2;color:var(--wos-danger);"><i class="fa-solid fa-user-shield"></i></div>
+    <div><div class="dash-card-label">Active Blocked IPs</div><div class="dash-card-value" style="color:var(--wos-danger);">{{ blocked_count }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#eff6ff;color:var(--wos-accent);"><i class="fa-solid fa-list-check"></i></div>
+    <div><div class="dash-card-label">Audits Today</div><div class="dash-card-value" style="color:var(--wos-accent);">{{ audit_today_count }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#f1f5f9;color:var(--wos-secondary);"><i class="fa-solid fa-users"></i></div>
+    <div><div class="dash-card-label">System Users</div><div class="dash-card-value">{{ total_users_count }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#fff7ed;color:var(--wos-warning);"><i class="fa-solid fa-box"></i></div>
+    <div><div class="dash-card-label">Products / Stock</div><div class="dash-card-value" style="color:var(--wos-warning);">{{ total_products }} <span style="font-size:14px;font-weight:400;color:var(--wos-text-muted);">/ {{ total_stock_units }} units</span></div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#fef2f2;color:#dc2626;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div><div class="dash-card-label">Low Stock Alerts</div><div class="dash-card-value" style="color:#dc2626;">{{ low_stock_count }}</div></div>
+  </div>
+</div>
+
+<div class="dash-section">
+  <div class="dash-panel">
+    <div class="dash-panel-header"><span><i class="fa-solid fa-truck" style="color:var(--wos-accent);"></i> Order Pipeline</span></div>
+    <div class="order-bar">
+      <div class="order-bar-seg" style="background:#fef3c7;color:#92400e;">Pending<br><strong>{{ order_counts.pending }}</strong></div>
+      <div class="order-bar-seg" style="background:#dbeafe;color:#1e40af;">Packed<br><strong>{{ order_counts.packed }}</strong></div>
+      <div class="order-bar-seg" style="background:#e0e7ff;color:#3730a3;">Shipped<br><strong>{{ order_counts.shipped }}</strong></div>
+      <div class="order-bar-seg" style="background:#dcfce7;color:#166534;">Delivered<br><strong>{{ order_counts.delivered }}</strong></div>
+    </div>
+
+    <div class="dash-panel-header" style="margin-top:16px;"><span><i class="fa-solid fa-shield-halved" style="color:var(--wos-accent);"></i> Recent Audit Log</span><a href="{{ url_for('audit_page') }}" style="color:var(--wos-accent);font-size:13px;text-decoration:none;">View All <i class="fa-solid fa-arrow-right"></i></a></div>
+    <div class="wos-table-wrapper" style="border:none;">
+      <table class="wos-table">
+        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>IP</th></tr></thead>
+        <tbody>
+          {% for event in recent_security_events %}
+          <tr>
+            <td style="font-size:12px;color:var(--wos-text-muted);">{{ event.timestamp[:19].replace('T',' ') }}</td>
+            <td style="font-weight:600;font-size:13px;">{{ event.username or 'System' }}</td>
+            <td><span class="wos-badge wos-badge-neutral" style="font-size:11px;">{{ event.action }}</span></td>
+            <td style="font-family:monospace;font-size:12px;color:var(--wos-text-muted);">{{ event.ip_address }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--wos-text-muted);">No recent logs.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel" style="display:flex;flex-direction:column;gap:12px;">
+    <div class="dash-panel-header"><span><i class="fa-solid fa-bolt" style="color:var(--wos-accent);"></i> Quick Actions</span></div>
+    <a href="{{ url_for('admin_users') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-users-gear" style="color:var(--wos-accent);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">User Accounts</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Manage users & roles</small></span>
+    </a>
+    <a href="{{ url_for('blocked_ips') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-ban" style="color:var(--wos-danger);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">IP Firewall</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Monitor blocked IPs</small></span>
+    </a>
+    <a href="{{ url_for('admin_config') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-sliders" style="color:var(--wos-secondary);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">System Config</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Thresholds & constants</small></span>
+    </a>
+
+    {% if low_stock_products %}
+    <div style="margin-top:8px;">
+      <div style="font-size:13px;font-weight:600;color:#dc2626;margin-bottom:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Low Stock — Needs Reorder</div>
+      {% for p in low_stock_products[:5] %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--wos-border);font-size:12px;">
+        <div><span>{{ p.name }}</span><br><span style="color:var(--wos-text-muted);font-size:11px;">{{ p.stock }} / {{ p.reorder }}</span></div>
+        <a href="{{ url_for('purchase_order_new', sku=p.sku) }}" class="wos-btn wos-btn-primary" style="padding:3px 10px;font-size:11px;text-decoration:none;">Reorder</a>
+      </div>
+      {% endfor %}
+      <a href="{{ url_for('purchase_order_new') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:center;margin-top:8px;padding:8px;font-size:12px;">
+        <i class="fa-solid fa-plus"></i> Create Full PO
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ============ MANAGER DASHBOARD ============ -->
+{% elif current_user.role == 'manager' %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+  <div>
+    <h1 style="font-size:22px;font-weight:700;margin-bottom:4px;">Operations Manager Dashboard</h1>
+    <p style="color:var(--wos-text-muted);font-size:14px;">Inventory Valuation & Order Pipeline</p>
+  </div>
+  <span class="wos-badge wos-badge-info" style="padding:6px 12px;font-size:12px;">MANAGER</span>
+</div>
+
+<div class="dash-grid">
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#dbeafe;color:var(--wos-accent);"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+    <div><div class="dash-card-label">Total Inventory Value</div><div class="dash-card-value" style="color:var(--wos-primary);">&#8377;{{ "{:,.0f}".format(total_valuation) }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#fef3c7;color:#92400e;"><i class="fa-solid fa-hourglass-half"></i></div>
+    <div><div class="dash-card-label">Pending Orders</div><div class="dash-card-value" style="color:#92400e;">{{ order_counts.pending }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#dcfce7;color:#166534;"><i class="fa-solid fa-boxes-packing"></i></div>
+    <div><div class="dash-card-label">Packed Today</div><div class="dash-card-value" style="color:#166534;">{{ packed_today_all }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#fee2e2;color:var(--wos-danger);"><i class="fa-solid fa-dumpster-fire"></i></div>
+    <div><div class="dash-card-label">Write-Offs Today</div><div class="dash-card-value" style="color:var(--wos-danger);">&#8377;{{ "{:,.0f}".format(writeoff_value_today) }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#fff7ed;color:var(--wos-warning);"><i class="fa-solid fa-box"></i></div>
+    <div><div class="dash-card-label">Total Products</div><div class="dash-card-value" style="color:var(--wos-warning);">{{ total_products }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#fef2f2;color:#dc2626;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div><div class="dash-card-label">Low Stock Alerts</div><div class="dash-card-value" style="color:#dc2626;">{{ low_stock_count }}</div></div>
+  </div>
+</div>
+
+<div class="dash-section">
+  <div class="dash-panel">
+    <div class="dash-panel-header"><span><i class="fa-solid fa-truck" style="color:var(--wos-accent);"></i> Order Pipeline</span></div>
+    <div class="order-bar">
+      <div class="order-bar-seg" style="background:#fef3c7;color:#92400e;">Pending<br><strong>{{ order_counts.pending }}</strong></div>
+      <div class="order-bar-seg" style="background:#dbeafe;color:#1e40af;">Packed<br><strong>{{ order_counts.packed }}</strong></div>
+      <div class="order-bar-seg" style="background:#e0e7ff;color:#3730a3;">Shipped<br><strong>{{ order_counts.shipped }}</strong></div>
+      <div class="order-bar-seg" style="background:#dcfce7;color:#166534;">Delivered<br><strong>{{ order_counts.delivered }}</strong></div>
+    </div>
+
+    <div class="dash-panel-header" style="margin-top:16px;"><span><i class="fa-solid fa-clock" style="color:var(--wos-accent);"></i> Recent Orders</span><a href="{{ url_for('fulfillment') }}" style="color:var(--wos-accent);font-size:13px;text-decoration:none;">View All <i class="fa-solid fa-arrow-right"></i></a></div>
+    <div class="wos-table-wrapper" style="border:none;">
+      <table class="wos-table">
+        <thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {% for order in recent_orders %}
+          <tr>
+            <td style="font-family:monospace;font-weight:500;font-size:12px;">{{ order.order_id[:12] }}..</td>
+            <td style="font-size:13px;">{{ order.customer_name }}</td>
+            <td style="font-weight:600;">&#8377;{{ "%.0f"|format(order.total_value or 0) }}</td>
+            <td><span class="wos-badge {% if order.status=='pending' %}wos-badge-warning{% elif order.status=='packed' %}wos-badge-success{% else %}wos-badge-info{% endif %}">{{ order.status }}</span></td>
+            <td><a href="{{ url_for('order_detail', order_id=order.order_id) }}" class="wos-btn wos-btn-secondary" style="padding:4px 10px;font-size:12px;">View</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--wos-text-muted);">No orders yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel" style="display:flex;flex-direction:column;gap:12px;">
+    <div class="dash-panel-header"><span><i class="fa-solid fa-bolt" style="color:var(--wos-accent);"></i> Shortcuts</span></div>
+    <a href="{{ url_for('export_page') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-file-csv" style="color:var(--wos-accent);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">Export Data</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Download CSV reports</small></span>
+    </a>
+    <a href="{{ url_for('stock_in') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-arrow-down" style="color:var(--wos-success);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">Stock Receiving</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Add incoming stock to warehouse</small></span>
+    </a>
+    <a href="{{ url_for('purchase_orders_list') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-file-invoice" style="color:var(--wos-secondary);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">Purchase Orders</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Track supplier orders</small></span>
+    </a>
+    <a href="{{ url_for('writeoff_page') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-triangle-exclamation" style="color:var(--wos-warning);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">Stock Write-Offs</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Submit write-offs (no limit)</small></span>
+    </a>
+    <a href="{{ url_for('inventory') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-box-open" style="color:var(--wos-success);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">Inventory</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Monitor stock & reorder points</small></span>
+    </a>
+
+    {% if low_stock_products %}
+    <div style="margin-top:8px;">
+      <div style="font-size:13px;font-weight:600;color:#dc2626;margin-bottom:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Low Stock — Needs Reorder</div>
+      {% for p in low_stock_products[:5] %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--wos-border);font-size:12px;">
+        <div><span>{{ p.name }}</span><br><span style="color:var(--wos-text-muted);font-size:11px;">{{ p.stock }} / {{ p.reorder }}</span></div>
+        <a href="{{ url_for('purchase_order_new', sku=p.sku) }}" class="wos-btn wos-btn-primary" style="padding:3px 10px;font-size:11px;text-decoration:none;">Reorder</a>
+      </div>
+      {% endfor %}
+      <a href="{{ url_for('purchase_order_new') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:center;margin-top:8px;padding:8px;font-size:12px;">
+        <i class="fa-solid fa-plus"></i> Create Full PO
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ============ STAFF DASHBOARD ============ -->
+{% elif current_user.role == 'staff' %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+  <div>
+    <h1 style="font-size:22px;font-weight:700;margin-bottom:4px;">Staff Dashboard</h1>
+    <p style="color:var(--wos-text-muted);font-size:14px;">Fulfillment & Packing Operations</p>
+  </div>
+  <span class="wos-badge wos-badge-success" style="padding:6px 12px;font-size:12px;">STAFF</span>
+</div>
+
+<div class="dash-grid">
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#eff6ff;color:var(--wos-accent);"><i class="fa-solid fa-boxes-packing"></i></div>
+    <div><div class="dash-card-label">Pending Orders</div><div class="dash-card-value" style="color:var(--wos-accent);">{{ pending_count }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#dcfce7;color:#166534;"><i class="fa-solid fa-square-check"></i></div>
+    <div><div class="dash-card-label">Packed by You Today</div><div class="dash-card-value" style="color:#166534;">{{ packed_today_count }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#fef2f2;color:#dc2626;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div><div class="dash-card-label">Low Stock Items</div><div class="dash-card-value" style="color:#dc2626;">{{ low_stock_count }}</div></div>
+  </div>
+</div>
+
+<div class="dash-section">
+  <div class="dash-panel">
+    <div class="dash-panel-header"><span><i class="fa-solid fa-truck" style="color:var(--wos-accent);"></i> Order Pipeline</span></div>
+    <div class="order-bar">
+      <div class="order-bar-seg" style="background:#fef3c7;color:#92400e;">Pending<br><strong>{{ order_counts.pending }}</strong></div>
+      <div class="order-bar-seg" style="background:#dbeafe;color:#1e40af;">Packed<br><strong>{{ order_counts.packed }}</strong></div>
+      <div class="order-bar-seg" style="background:#e0e7ff;color:#3730a3;">Shipped<br><strong>{{ order_counts.shipped }}</strong></div>
+      <div class="order-bar-seg" style="background:#dcfce7;color:#166534;">Delivered<br><strong>{{ order_counts.delivered }}</strong></div>
+    </div>
+
+    <div class="dash-panel-header" style="margin-top:16px;"><span><i class="fa-solid fa-clock" style="color:var(--wos-accent);"></i> Urgent Pending Orders</span><a href="{{ url_for('fulfillment') }}" style="color:var(--wos-accent);font-size:13px;text-decoration:none;">Open Queue <i class="fa-solid fa-arrow-right"></i></a></div>
+    <div class="wos-table-wrapper" style="border:none;">
+      <table class="wos-table">
+        <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {% for order in recent_orders %}
+          <tr>
+            <td style="font-family:monospace;font-weight:500;font-size:12px;">{{ order.order_id[:12] }}..</td>
+            <td style="font-size:13px;">{{ order.customer_name }}</td>
+            <td>{% if order.items is iterable and not order.items is string %}{{ order.items|length }}{% else %}1{% endif %}</td>
+            <td><span class="wos-badge wos-badge-warning">{{ order.status }}</span></td>
+            <td><a href="{{ url_for('order_detail', order_id=order.order_id) }}" class="wos-btn wos-btn-primary" style="padding:4px 10px;font-size:12px;">Pack</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--wos-text-muted);"><i class="fa-solid fa-circle-check" style="font-size:32px;margin-bottom:12px;color:var(--wos-success);"></i><p>All orders packed!</p></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel" style="display:flex;flex-direction:column;gap:12px;">
+    <div class="dash-panel-header"><span><i class="fa-solid fa-bolt" style="color:var(--wos-accent);"></i> Tools</span></div>
+    <a href="{{ url_for('fulfillment') }}" class="wos-btn wos-btn-primary" style="width:100%;justify-content:center;padding:12px;font-weight:700;">
+      <i class="fa-solid fa-boxes-packing"></i> Start Packing
+    </a>
+    <a href="{{ url_for('delivery_queue') }}" class="wos-btn wos-btn-primary" style="width:100%;justify-content:center;padding:12px;font-weight:700;background:var(--wos-accent);">
+      <i class="fa-solid fa-truck"></i> Delivery Queue
+    </a>
+    <a href="{{ url_for('writeoff_page') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-triangle-exclamation" style="color:var(--wos-warning);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">Report Damage</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Submit write-off</small></span>
+    </a>
+    <a href="{{ url_for('inventory') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-box" style="color:var(--wos-secondary);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">Check Stock</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Browse product catalog</small></span>
+    </a>
+
+    {% if low_stock_products %}
+    <div style="margin-top:8px;">
+      <div style="font-size:13px;font-weight:600;color:#dc2626;margin-bottom:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Low Stock Items</div>
+      {% for p in low_stock_products[:5] %}
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--wos-border);font-size:12px;">
+        <span>{{ p.name }}</span>
+        <span style="color:#dc2626;font-weight:600;">{{ p.stock }} / {{ p.reorder }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ============ DELIVERY DASHBOARD ============ -->
+{% elif current_user.role == 'delivery' %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+  <div>
+    <h1 style="font-size:22px;font-weight:700;margin-bottom:4px;">Delivery Dashboard</h1>
+    <p style="color:var(--wos-text-muted);font-size:14px;">Track and complete your deliveries.</p>
+  </div>
+  <span class="wos-badge wos-badge-info" style="padding:6px 12px;font-size:12px;background:#dbeafe;color:#1e40af;">DELIVERY</span>
+</div>
+
+{% set shipped_count = order_counts.shipped if order_counts else 0 %}
+{% set delivered_count = order_counts.delivered if order_counts else 0 %}
+
+<div class="dash-grid">
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#dbeafe;color:var(--wos-accent);"><i class="fa-solid fa-truck"></i></div>
+    <div><div class="dash-card-label">Out for Delivery</div><div class="dash-card-value" style="color:var(--wos-accent);">{{ shipped_count }}</div></div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-icon" style="background:#dcfce7;color:#166534;"><i class="fa-solid fa-circle-check"></i></div>
+    <div><div class="dash-card-label">Delivered Today</div><div class="dash-card-value" style="color:#166534;">{{ delivered_today_count or 0 }}</div></div>
+  </div>
+</div>
+
+<div class="dash-section">
+  <div class="dash-panel">
+    <div class="dash-panel-header"><span><i class="fa-solid fa-clock" style="color:var(--wos-accent);"></i> Ready to Deliver</span><a href="{{ url_for('delivery_queue') }}" style="color:var(--wos-accent);font-size:13px;text-decoration:none;">Open Queue <i class="fa-solid fa-arrow-right"></i></a></div>
+    <div class="wos-table-wrapper" style="border:none;">
+      <table class="wos-table">
+        <thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>Shipped</th><th></th></tr></thead>
+        <tbody>
+          {% for order in shipped_orders[:5] %}
+          <tr>
+            <td style="font-family:monospace;font-weight:500;font-size:12px;">{{ order.order_id[:12] }}..</td>
+            <td style="font-size:13px;font-weight:600;">{{ order.customer_name }}</td>
+            <td style="font-weight:600;">₹{{ "%.0f"|format(order.total_value or 0) }}</td>
+            <td style="font-size:12px;color:var(--wos-text-muted);">{{ order.updated_at[:16].replace('T',' ') if order.updated_at else '—' }}</td>
+            <td><a href="{{ url_for('delivery_queue') }}" class="wos-btn wos-btn-success" style="padding:4px 10px;font-size:12px;">Deliver</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--wos-text-muted);"><i class="fa-solid fa-circle-check" style="font-size:32px;margin-bottom:12px;color:var(--wos-success);display:block;"></i><p>No orders out for delivery!</p></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-panel" style="display:flex;flex-direction:column;gap:12px;">
+    <div class="dash-panel-header"><span><i class="fa-solid fa-bolt" style="color:var(--wos-accent);"></i> Quick Actions</span></div>
+    <a href="{{ url_for('delivery_queue') }}" class="wos-btn wos-btn-primary" style="width:100%;justify-content:center;padding:12px;font-weight:700;">
+      <i class="fa-solid fa-truck"></i> Delivery Queue
+    </a>
+    <a href="{{ url_for('change_password') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
+      <i class="fa-solid fa-key" style="color:var(--wos-secondary);width:20px;"></i>
+      <span><strong style="display:block;font-size:14px;">Change Password</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Update your password</small></span>
+    </a>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

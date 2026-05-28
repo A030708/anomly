@@ -1,0 +1,670 @@
+{% extends "base.html" %}
+
+{% block title %}Vulnerabilities - {{ platform_name }}{% endblock %}
+{% block page_title %}Vulnerability Management{% endblock %}
+{% block breadcrumb %}Vulnerabilities{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-bar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 14px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+    .filter-input, .filter-select {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 13px;
+        outline: none;
+    }
+    .filter-input:focus  { border-color: #00d4ff; }
+    .filter-input::placeholder { color: rgba(255,255,255,0.35); }
+    .filter-select option { background: #1a2035; }
+    .cvss-badge {
+        padding: 3px 9px;
+        border-radius: 5px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .cvss-critical { background:rgba(255,71,87,0.15);  color:#ff4757; }
+    .cvss-high     { background:rgba(255,107,53,0.15); color:#ff6b35; }
+    .cvss-medium   { background:rgba(255,215,0,0.15);  color:#ffd700; }
+    .cvss-low      { background:rgba(0,212,255,0.12);  color:#00d4ff; }
+    .cvss-score {
+        font-size: 20px;
+        font-weight: 700;
+        font-family: monospace;
+    }
+    .exploit-badge {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+    .exploit-yes { background:rgba(255,71,87,0.15); color:#ff4757; }
+    .exploit-no  { background:rgba(100,116,139,0.15); color:#64748b; }
+    .vuln-row-critical { border-left: 3px solid #ff4757; }
+    .vuln-row-high     { border-left: 3px solid #ff6b35; }
+    .vuln-row-medium   { border-left: 3px solid #ffd700; }
+    .vuln-row-low      { border-left: 3px solid #00d4ff; }
+    .tabs-nav {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .tab-pill {
+        padding: 9px 18px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-size: 13px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: all 0.2s;
+    }
+    .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+    .tab-pill:hover  { color: var(--text-primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .patch-status-btn {
+        padding: 4px 10px;
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .patch-unpatched {
+        background: rgba(255,71,87,0.15);
+        color: #ff4757;
+        border: 1px solid rgba(255,71,87,0.3);
+    }
+    .patch-in-progress {
+        background: rgba(255,215,0,0.15);
+        color: #ffd700;
+        border: 1px solid rgba(255,215,0,0.3);
+    }
+    .patch-patched {
+        background: rgba(0,255,136,0.12);
+        color: #00ff88;
+        border: 1px solid rgba(0,255,136,0.25);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Row -->
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Total Vulns',   stats.total,      '#e2e8f0', 'fas fa-bug',              'rgba(255,71,87,0.08)'),
+        ('Critical',      stats.critical,   '#ff4757', 'fas fa-circle-exclamation','rgba(255,71,87,0.12)'),
+        ('High',          stats.high,       '#ff6b35', 'fas fa-triangle-exclamation','rgba(255,107,53,0.12)'),
+        ('Exploitable',   stats.exploitable,'#ffd700', 'fas fa-skull',            'rgba(255,215,0,0.12)'),
+        ('Unpatched',     stats.unpatched,  '#a855f7', 'fas fa-shield-halved',    'rgba(168,85,247,0.12)'),
+        ('Patched 30d',   stats.patched_30d,'#00ff88', 'fas fa-check-shield',     'rgba(0,255,136,0.08)'),
+    ] %}
+    {% for label, value, color, icon, bg in kpis %}
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:22px;">{{ value }}</div>
+                </div>
+                <div class="stat-icon" style="background:{{ bg }};">
+                    <i class="{{ icon }}" style="color:{{ color }};"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Charts Row -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-pie" style="color:#ff4757;"></i>
+                <span class="card-title">Severity Distribution</span>
+            </div>
+            <div class="card-body">
+                <canvas id="vulnSeverityChart" height="180"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-bar" style="color:#ffd700;"></i>
+                <span class="card-title">Top Vulnerable Assets</span>
+            </div>
+            <div class="card-body">
+                <canvas id="assetVulnChart" height="180"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-line" style="color:#00d4ff;"></i>
+                <span class="card-title">Patch Trend (30 days)</span>
+            </div>
+            <div class="card-body">
+                <canvas id="patchTrendChart" height="180"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs-nav">
+    <button class="tab-pill active" onclick="switchTab('all', this)">
+        All Vulnerabilities
+    </button>
+    <button class="tab-pill" onclick="switchTab('critical', this)">
+        <span style="color:#ff4757;">●</span> Critical
+    </button>
+    <button class="tab-pill" onclick="switchTab('exploitable', this)">
+        <i class="fas fa-skull me-1" style="color:#ffd700;"></i> Exploitable
+    </button>
+    <button class="tab-pill" onclick="switchTab('unpatched', this)">
+        Unpatched
+    </button>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <i class="fas fa-filter" style="color:var(--text-muted);font-size:12px;"></i>
+    <input type="text" class="filter-input" id="vulnSearch"
+           placeholder="Search CVE, name, asset..."
+           style="flex:1;min-width:200px;">
+    <select class="filter-select" id="severityFilter">
+        <option value="">All Severities</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+    </select>
+    <select class="filter-select" id="patchFilter">
+        <option value="">Patch Status</option>
+        <option value="unpatched">Unpatched</option>
+        <option value="in-progress">In Progress</option>
+        <option value="patched">Patched</option>
+    </select>
+    <select class="filter-select" id="exploitFilter">
+        <option value="">Exploit Status</option>
+        <option value="yes">Exploitable</option>
+        <option value="no">No Exploit</option>
+    </select>
+    <div class="ms-auto d-flex gap-2">
+        <button onclick="runScan()"
+                class="btn-primary-custom"
+                style="background:linear-gradient(135deg,#ff6b35,#ff4757);
+                       font-size:12px;padding:7px 14px;">
+            <i class="fas fa-radar"></i> Run Scan
+        </button>
+        <a href="{{ url_for('vulnerabilities.add_vuln') }}"
+           class="btn-primary-custom" style="font-size:12px;padding:7px 14px;">
+            <i class="fas fa-plus"></i> Add Vuln
+        </a>
+    </div>
+</div>
+
+<!-- All Tab -->
+<div class="tab-content active" id="tab-all">
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-bug" style="color:#ffd700;"></i>
+            <span class="card-title">Vulnerabilities</span>
+            <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">
+                {{ vulns|length }} found
+            </span>
+        </div>
+        <div class="table-responsive">
+            <table class="table" id="vulnTable">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="selectAll"></th>
+                        <th>CVE / ID</th>
+                        <th>Name</th>
+                        <th>Severity</th>
+                        <th>CVSS</th>
+                        <th>Affected Asset</th>
+                        <th>Exploit</th>
+                        <th>Patch Status</th>
+                        <th>Discovered</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="vulnBody">
+                    {% if vulns %}
+                        {% for vuln in vulns %}
+                        <tr class="vuln-row-{{ vuln.severity|lower }}"
+                            data-severity="{{ vuln.severity|lower }}"
+                            data-patch="{{ vuln.patch_status|lower if vuln.patch_status else 'unpatched' }}"
+                            data-exploit="{{ 'yes' if vuln.has_exploit else 'no' }}">
+                            <td><input type="checkbox" class="vuln-check"></td>
+                            <td>
+                                <a href="https://nvd.nist.gov/vuln/detail/{{ vuln.cve_id }}"
+                                   target="_blank"
+                                   style="color:#00d4ff;font-family:monospace;font-size:12px;
+                                          font-weight:600;text-decoration:none;">
+                                    {{ vuln.cve_id or '#' ~ vuln.id }}
+                                </a>
+                            </td>
+                            <td>
+                                <div style="font-size:13px;font-weight:500;max-width:200px;">
+                                    {{ vuln.name[:45] if vuln.name else 'N/A' }}
+                                </div>
+                                <div style="font-size:10px;color:var(--text-muted);">
+                                    {{ vuln.vendor or '' }}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="severity-badge severity-{{ vuln.severity|lower }}">
+                                    {{ vuln.severity }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="cvss-score"
+                                      style="color:{{ '#ff4757' if (vuln.cvss_score or 0)>=9
+                                                     else '#ff6b35' if (vuln.cvss_score or 0)>=7
+                                                     else '#ffd700' if (vuln.cvss_score or 0)>=4
+                                                     else '#00d4ff' }};">
+                                    {{ '%.1f'|format(vuln.cvss_score or 0) }}
+                                </span>
+                            </td>
+                            <td style="font-size:12px;color:var(--text-secondary);">
+                                {{ vuln.affected_asset or 'Multiple' }}
+                            </td>
+                            <td>
+                                <span class="exploit-badge exploit-{{ 'yes' if vuln.has_exploit else 'no' }}">
+                                    {{ 'YES' if vuln.has_exploit else 'NO' }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="patch-status-btn patch-{{ (vuln.patch_status or 'unpatched')|lower|replace(' ','-') }}">
+                                    {{ vuln.patch_status or 'Unpatched' }}
+                                </span>
+                            </td>
+                            <td style="font-size:11px;color:var(--text-muted);white-space:nowrap;">
+                                {{ vuln.discovered_at.strftime('%Y-%m-%d') if vuln.discovered_at else 'N/A' }}
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <a href="{{ url_for('vulnerabilities.vuln_detail', vuln_id=vuln.id) }}"
+                                       style="padding:3px 8px;background:rgba(0,212,255,0.1);
+                                              border:1px solid rgba(0,212,255,0.2);color:#00d4ff;
+                                              border-radius:5px;font-size:10px;text-decoration:none;">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button onclick="patchVuln('{{ vuln.id }}')"
+                                            style="padding:3px 8px;background:rgba(0,255,136,0.1);
+                                                   border:1px solid rgba(0,255,136,0.2);color:#00ff88;
+                                                   border-radius:5px;font-size:10px;cursor:pointer;">
+                                        <i class="fas fa-wrench"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="10">
+                                <div class="empty-state">
+                                    <i class="fas fa-bug"></i>
+                                    <p>No vulnerabilities found</p>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Critical Tab -->
+<div class="tab-content" id="tab-critical">
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-circle-exclamation" style="color:#ff4757;"></i>
+            <span class="card-title">Critical Vulnerabilities</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>CVE ID</th><th>Name</th><th>CVSS</th>
+                        <th>Asset</th><th>Exploit</th><th>Status</th><th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vuln in vulns if vuln.severity == 'Critical' %}
+                    <tr class="vuln-row-critical">
+                        <td style="font-family:monospace;font-size:12px;color:#00d4ff;">
+                            {{ vuln.cve_id or '#' ~ vuln.id }}
+                        </td>
+                        <td style="font-size:13px;font-weight:500;">
+                            {{ vuln.name[:40] if vuln.name else 'N/A' }}
+                        </td>
+                        <td>
+                            <span class="cvss-score" style="color:#ff4757;">
+                                {{ '%.1f'|format(vuln.cvss_score or 0) }}
+                            </span>
+                        </td>
+                        <td style="font-size:12px;">{{ vuln.affected_asset or 'Multiple' }}</td>
+                        <td>
+                            <span class="exploit-badge exploit-{{ 'yes' if vuln.has_exploit else 'no' }}">
+                                {{ 'YES' if vuln.has_exploit else 'NO' }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="patch-status-btn patch-{{ (vuln.patch_status or 'unpatched')|lower|replace(' ','-') }}">
+                                {{ vuln.patch_status or 'Unpatched' }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('vulnerabilities.vuln_detail', vuln_id=vuln.id) }}"
+                               style="padding:4px 9px;background:rgba(0,212,255,0.1);
+                                      border:1px solid rgba(0,212,255,0.2);color:#00d4ff;
+                                      border-radius:5px;font-size:11px;text-decoration:none;">
+                                <i class="fas fa-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="fas fa-check-circle" style="color:#00ff88;"></i>
+                                <p style="color:#00ff88;">No critical vulnerabilities!</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Exploitable Tab -->
+<div class="tab-content" id="tab-exploitable">
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-skull" style="color:#ffd700;"></i>
+            <span class="card-title">Exploitable Vulnerabilities</span>
+            <span style="font-size:11px;color:#ff4757;margin-left:8px;">
+                Immediate remediation required
+            </span>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>CVE ID</th><th>Name</th><th>Severity</th>
+                        <th>CVSS</th><th>Asset</th><th>PoC Available</th><th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vuln in vulns if vuln.has_exploit %}
+                    <tr class="vuln-row-{{ vuln.severity|lower }}">
+                        <td style="font-family:monospace;font-size:12px;color:#00d4ff;">
+                            {{ vuln.cve_id or '#' ~ vuln.id }}
+                        </td>
+                        <td style="font-size:13px;font-weight:500;">
+                            {{ vuln.name[:40] if vuln.name else 'N/A' }}
+                        </td>
+                        <td>
+                            <span class="severity-badge severity-{{ vuln.severity|lower }}">
+                                {{ vuln.severity }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="cvss-score"
+                                  style="color:{{ '#ff4757' if (vuln.cvss_score or 0)>=9 else '#ff6b35' }};">
+                                {{ '%.1f'|format(vuln.cvss_score or 0) }}
+                            </span>
+                        </td>
+                        <td style="font-size:12px;">{{ vuln.affected_asset or 'Multiple' }}</td>
+                        <td>
+                            <span class="exploit-badge exploit-yes">PoC Available</span>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <a href="{{ url_for('vulnerabilities.vuln_detail', vuln_id=vuln.id) }}"
+                                   style="padding:4px 9px;background:rgba(0,212,255,0.1);
+                                          border:1px solid rgba(0,212,255,0.2);color:#00d4ff;
+                                          border-radius:5px;font-size:11px;text-decoration:none;">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button onclick="patchVuln('{{ vuln.id }}')"
+                                        style="padding:4px 9px;background:rgba(255,71,87,0.1);
+                                               border:1px solid rgba(255,71,87,0.2);color:#ff4757;
+                                               border-radius:5px;font-size:11px;cursor:pointer;">
+                                    <i class="fas fa-bolt"></i> Patch Now
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="fas fa-shield-check" style="color:#00ff88;"></i>
+                                <p style="color:#00ff88;">No exploitable vulnerabilities!</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Unpatched Tab -->
+<div class="tab-content" id="tab-unpatched">
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-shield-halved" style="color:#a855f7;"></i>
+            <span class="card-title">Unpatched Vulnerabilities</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>CVE ID</th><th>Name</th><th>Severity</th>
+                        <th>Days Open</th><th>Asset</th><th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vuln in vulns if not vuln.patch_status or vuln.patch_status == 'Unpatched' %}
+                    <tr class="vuln-row-{{ vuln.severity|lower }}">
+                        <td style="font-family:monospace;font-size:12px;color:#00d4ff;">
+                            {{ vuln.cve_id or '#' ~ vuln.id }}
+                        </td>
+                        <td style="font-size:13px;font-weight:500;">
+                            {{ vuln.name[:40] if vuln.name else 'N/A' }}
+                        </td>
+                        <td>
+                            <span class="severity-badge severity-{{ vuln.severity|lower }}">
+                                {{ vuln.severity }}
+                            </span>
+                        </td>
+                        <td style="font-size:13px;font-weight:600;
+                                   color:{{ '#ff4757' if vuln.days_open and vuln.days_open > 30 else '#ffd700' }};">
+                            {{ vuln.days_open or 0 }}d
+                        </td>
+                        <td style="font-size:12px;">{{ vuln.affected_asset or 'Multiple' }}</td>
+                        <td>
+                            <button onclick="patchVuln('{{ vuln.id }}')"
+                                    style="padding:5px 12px;background:rgba(0,255,136,0.1);
+                                           border:1px solid rgba(0,255,136,0.2);color:#00ff88;
+                                           border-radius:6px;font-size:11px;cursor:pointer;">
+                                <i class="fas fa-wrench"></i> Patch
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="fas fa-check-double" style="color:#00ff88;"></i>
+                                <p style="color:#00ff88;">All vulnerabilities patched!</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+
+// Filter
+document.getElementById('vulnSearch').addEventListener('input', filterVulns);
+document.getElementById('severityFilter').addEventListener('change', filterVulns);
+document.getElementById('patchFilter').addEventListener('change', filterVulns);
+document.getElementById('exploitFilter').addEventListener('change', filterVulns);
+
+function filterVulns() {
+    const search  = document.getElementById('vulnSearch').value.toLowerCase();
+    const sev     = document.getElementById('severityFilter').value.toLowerCase();
+    const patch   = document.getElementById('patchFilter').value.toLowerCase();
+    const exploit = document.getElementById('exploitFilter').value.toLowerCase();
+
+    document.querySelectorAll('#vulnBody tr[data-severity]').forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const ok   = (!search  || text.includes(search)) &&
+                     (!sev     || row.dataset.severity === sev) &&
+                     (!patch   || row.dataset.patch.includes(patch)) &&
+                     (!exploit || row.dataset.exploit === exploit);
+        row.style.display = ok ? '' : 'none';
+    });
+}
+
+document.getElementById('selectAll').addEventListener('change', function() {
+    document.querySelectorAll('.vuln-check').forEach(cb => cb.checked = this.checked);
+});
+
+function patchVuln(id) {
+    if (confirm('Mark vulnerability as patched/in-progress?')) {
+        alert('Patch workflow initiated for vuln ID: ' + id);
+    }
+}
+
+function runScan() { alert('Vulnerability scan initiated. This may take a few minutes.'); }
+
+// Charts
+new Chart(document.getElementById('vulnSeverityChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Critical', 'High', 'Medium', 'Low'],
+        datasets: [{
+            data: [{{ stats.critical }}, {{ stats.high }}, {{ stats.medium }}, {{ stats.low }}],
+            backgroundColor: ['#ff4757', '#ff6b35', '#ffd700', '#00d4ff'],
+            borderWidth: 0, hoverOffset: 6
+        }]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false, cutout: '68%',
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { color: '#64748b', font: { size: 10 }, padding: 8, boxWidth: 10 }
+            }
+        }
+    }
+});
+
+new Chart(document.getElementById('assetVulnChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: ['SRV-001', 'WEB-02', 'DB-01', 'FW-01', 'END-05'],
+        datasets: [{
+            label: 'Vulnerabilities',
+            data: [24, 18, 15, 12, 9],
+            backgroundColor: ['rgba(255,71,87,0.7)', 'rgba(255,107,53,0.7)',
+                              'rgba(255,215,0,0.7)',  'rgba(0,212,255,0.7)',
+                              'rgba(168,85,247,0.7)'],
+            borderRadius: 5
+        }]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 } } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b' }, beginAtZero: true }
+        }
+    }
+});
+
+new Chart(document.getElementById('patchTrendChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: Array.from({length: 30}, (_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() - (29 - i));
+            return d.toLocaleDateString('en', {month:'short', day:'numeric'});
+        }).filter((_, i) => i % 5 === 0),
+        datasets: [
+            {
+                label: 'Patched',
+                data: [5, 12, 8, 18, 15, 22],
+                borderColor: '#00ff88',
+                backgroundColor: 'rgba(0,255,136,0.1)',
+                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3
+            },
+            {
+                label: 'New',
+                data: [8, 6, 14, 10, 12, 7],
+                borderColor: '#ff4757',
+                backgroundColor: 'rgba(255,71,87,0.08)',
+                borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3
+            }
+        ]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { color: '#64748b', font: { size: 10 }, padding: 8, boxWidth: 10 }
+            }
+        },
+        scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 } } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b' }, beginAtZero: true }
+        }
+    }
+});
+</script>
+{% endblock %}

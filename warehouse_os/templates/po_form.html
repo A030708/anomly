@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Create Purchase Order{% endblock %}
+{% block header_title %}Create Purchase Order{% endblock %}
+{% block content %}
+
+<h1 class="wos-page-title" style="margin-bottom: 24px;">New Purchase Order</h1>
+
+<div style="max-width: 700px;">
+  <form method="POST" class="wos-card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px;">Supplier</label>
+      <select name="supplier_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+        <option value="">-- Select Supplier --</option>
+        {% for s in suppliers %}
+        <option value="{{ s.id }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px;">Notes</label>
+      <input name="notes" placeholder="Optional notes" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px;">Products</label>
+        <span style="font-size: 12px; color: var(--wos-text-muted);">Check to include, set quantity</span>
+      </div>
+      <div id="product-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 400px; overflow-y: auto; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); padding: 8px;">
+        {% for p in products %}
+        <label style="display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: var(--wos-radius-md); {% if p.sku in pre_selected_skus %}background: #eff6ff;{% endif %} cursor: pointer; font-size: 13px;">
+          <input type="checkbox" name="sku" value="{{ p.sku }}" class="product-check" {% if p.sku in pre_selected_skus %}checked{% endif %} style="width: 16px; height: 16px;">
+          <span style="font-weight: 500; min-width: 80px;">{{ p.sku }}</span>
+          <span style="flex-grow: 1;">{{ p.name }}</span>
+          <span style="color: var(--wos-text-muted); font-size: 12px;">Stock: {{ p.stock_count }}</span>
+          <span style="color: var(--wos-text-muted); font-size: 12px;">Reorder: {{ p.reorder_level }}</span>
+          <input type="number" name="qty" value="{% if p.sku in pre_selected_skus %}{{ p.reorder_level * 2 - p.stock_count }}{% else %}0{% endif %}" min="0" style="width: 70px; padding: 4px 8px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 13px; text-align: center;">
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div id="po-summary" style="background: #f8fafc; border: 1px solid var(--wos-border); padding: 12px 16px; border-radius: var(--wos-radius-md); font-size: 14px; display: none;">
+      <strong>Summary:</strong> <span id="item-count">0</span> items selected
+    </div>
+
+    <button type="submit" class="wos-btn wos-btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+      <i class="fa-solid fa-file-invoice"></i> Create Purchase Order
+    </button>
+  </form>
+</div>
+
+<script>
+  const checks = document.querySelectorAll('.product-check');
+  const qtyInputs = document.querySelectorAll('input[name="qty"]');
+  const summary = document.getElementById('po-summary');
+  const itemCount = document.getElementById('item-count');
+
+  function updateSummary() {
+    let count = 0;
+    checks.forEach((cb, i) => {
+      if (cb.checked) {
+        const qty = parseInt(qtyInputs[i].value) || 0;
+        if (qty > 0) count++;
+      }
+    });
+    if (count > 0) {
+      summary.style.display = 'block';
+      itemCount.textContent = count;
+    } else {
+      summary.style.display = 'none';
+    }
+  }
+
+  checks.forEach(cb => cb.addEventListener('change', updateSummary));
+  qtyInputs.forEach(q => q.addEventListener('input', updateSummary));
+  updateSummary();
+</script>
+
+{% endblock %}

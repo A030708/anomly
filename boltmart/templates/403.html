@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Access Denied - BoltMart</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body style="background: #fef2f2; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; font-family: 'Outfit', sans-serif;">
+    <div class="bm-glass-panel" style="max-width: 500px; width: 100%; border-top: 4px solid #b91c1c; text-align: center;">
+        <div style="font-size: 64px; margin-bottom: 16px;">&#128737;</div>
+        <h1 class="bm-page-title" style="font-size: 28px; color: #b91c1c; margin-bottom: 8px;">Access Denied</h1>
+        <p style="color: var(--bm-text-muted); margin-bottom: 24px;">
+            This request has been blocked by our security monitoring system.
+        </p>
+
+        <div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--bm-radius-md); padding: 16px; text-align: left; font-size: 14px; margin-bottom: 24px;">
+            <p style="margin-bottom: 8px;"><strong>Your IP:</strong> {{ ip or 'Unknown' }}</p>
+            <p style="margin-bottom: 8px;"><strong>Reason:</strong> {{ reason or 'Security policy violation' }}</p>
+            <p style="margin-bottom: 8px;"><strong>Severity:</strong>
+                <span class="bm-badge" style="{% if severity == 'critical' %}background:#fef2f2;color:#b91c1c;{% elif severity == 'high' %}background:#fff7ed;color:#c2410c;{% else %}background:#fefce8;color:#a16207;{% endif %}">
+                    {{ severity }}
+                </span>
+            </p>
+            {% if incident_id %}
+            <p style="margin-bottom: 8px;"><strong>Incident ID:</strong> <code style="background: #e2e8f0; padding: 2px 4px; border-radius: 4px;">{{ incident_id }}</code></p>
+            {% endif %}
+            {% if until %}
+            <p><strong>Until:</strong> {{ until[:19].replace('T',' ') }}</p>
+            {% endif %}
+        </div>
+
+        <p style="font-size: 13px; color: var(--bm-text-muted); margin-bottom: 24px;">
+            If you believe this is an error, please contact support and quote the Incident ID above.
+        </p>
+
+        <a href="/" class="bm-btn" style="background: var(--bm-text-main); color: white; width: 100%;">
+            Return Home
+        </a>
+    </div>
+</body>
+</html>

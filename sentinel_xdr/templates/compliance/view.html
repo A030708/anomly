@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Compliance - {{ platform_name }}{% endblock %}
+{% block page_title %}Compliance & Audit{% endblock %}
+{% block breadcrumb %}Compliance{% endblock %}
+
+{% block extra_css %}
+<style>
+    .compliance-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; height: 100%; transition: all 0.2s; }
+    .compliance-card:hover { background: var(--bg-card-hover); border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+    .framework-badge { padding: 3px 10px; border-radius: 5px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; }
+    .control-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; }
+    .control-row:last-child { border-bottom: none; }
+    .control-row:hover { background: rgba(255,255,255,0.02); }
+    .status-pill { padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; }
+    .tabs-nav { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .tab-pill { padding: 9px 18px; background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
+    .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+    .tab-pill:hover { color: var(--text-primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .filter-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+    .filter-select option { background: #1a2035; }
+    .filter-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; outline: none; }
+    .filter-input:focus { border-color: #00d4ff; }
+    .compliance-gauge { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; flex-shrink: 0; }
+    .evidence-file { display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s; }
+    .evidence-file:hover { background: rgba(255,255,255,0.06); border-color: rgba(0,212,255,0.2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Frameworks Tracked', stats.frameworks or 6, '#00d4ff', 'fas fa-book', 'rgba(0,212,255,0.1)'),
+        ('Controls Total', stats.controls or 186, '#e2e8f0', 'fas fa-list-check', 'rgba(255,255,255,0.06)'),
+        ('Passed', stats.passed or 152, '#00ff88', 'fas fa-check-circle', 'rgba(0,255,136,0.1)'),
+        ('Failed', stats.failed or 18, '#ff4757', 'fas fa-times-circle', 'rgba(255,71,87,0.12)'),
+        ('Not Tested', stats.not_tested or 16, '#ffd700', 'fas fa-question-circle', 'rgba(255,215,0,0.12)'),
+        ('Overall', stats.overall_pct or '74%', '#a855f7', 'fas fa-shield', 'rgba(168,85,247,0.12)'),
+    ] %}
+    {% for label, value, color, icon, bg in kpis %}
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:22px;">{{ value }}</div>
+                </div>
+                <div class="stat-icon" style="background:{{ bg }};"><i class="{{ icon }}" style="color:{{ color }};"></i></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="tabs-nav">
+    <button class="tab-pill active" onclick="switchTab('overview', this)"><i class="fas fa-gauge-high"></i> Overview</button>
+    <button class="tab-pill" onclick="switchTab('frameworks', this)"><i class="fas fa-book"></i> Frameworks</button>
+    <button class="tab-pill" onclick="switchTab('controls', this)"><i class="fas fa-list-check"></i> Controls</button>
+    <button class="tab-pill" onclick="switchTab('evidence', this)"><i class="fas fa-folder-tree"></i> Evidence Files</button>
+</div>
+
+<div class="tab-content active" id="tab-overview">
+    <div class="row g-4">
+        <div class="col-lg-8"><div class="card"><div class="card-header"><i class="fas fa-chart-bar" style="color:#00d4ff;"></i><span class="card-title">Compliance Posture by Framework</span></div><div class="card-body"><canvas id="complianceChart" height="260"></canvas></div></div></div>
+        <div class="col-lg-4">
+            <div style="text-align:center;padding:20px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;margin-bottom:16px;">
+                <div class="compliance-gauge" style="margin:0 auto 12px;background:rgba(0,212,255,0.1);border:3px solid #00d4ff;">74%</div>
+                <div style="font-size:13px;color:var(--text-primary);font-weight:600;">Overall Compliance</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Across 186 controls &middot; 6 frameworks</div>
+            </div>
+            {% set summary = [('Critical Controls', 42, '#ff4757'),('High Controls', 68, '#ff6b35'),('Medium Controls', 54, '#ffd700'),('Low Controls', 22, '#00d4ff')] %}
+            {% for label, count, color in summary %}
+            <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.04);"><span style="font-size:12px;color:var(--text-secondary);">{{ label }}</span><span style="font-size:13px;font-weight:600;color:{{ color }};">{{ count }}</span></div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="tab-content" id="tab-frameworks">
+    <div class="row g-3">
+        {% set fws = [
+            ('NIST SP 800-53', 'NIST', '74%', '#00d4ff', 124, 92, 18, 14, 'Moderate'),
+            ('ISO 27001:2022', 'ISO', '82%', '#00ff88', 114, 93, 12, 9, 'High'),
+            ('SOC 2 Type II', 'SOC2', '71%', '#a855f7', 98, 70, 16, 12, 'Moderate'),
+            ('PCI DSS v4.0', 'PCI', '88%', '#ffd700', 76, 67, 5, 4, 'High'),
+            ('GDPR', 'GDPR', '67%', '#ff6b35', 52, 35, 10, 7, 'Moderate'),
+            ('HIPAA', 'HIPAA', '76%', '#ff4757', 64, 49, 8, 7, 'High'),
+        ] %}
+        {% for name, abbr, pct, color, total, passed, failed, untested, level in fws %}
+        <div class="col-md-4">
+            <div class="compliance-card">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div><span class="framework-badge" style="background:{{ color }}15;color:{{ color }};">{{ abbr }}</span><span style="font-size:10px;color:var(--text-muted);margin-left:6px;">{{ total }} controls</span></div>
+                    <span style="font-size:24px;font-weight:700;color:{{ color }};">{{ pct }}</span>
+                </div>
+                <div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">{{ name }}</div>
+                <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-bottom:10px;">
+                    <div style="display:flex;height:100%;border-radius:3px;overflow:hidden;">
+                        <div style="width:{{ (passed/total*100)|int }}%;background:#00ff88;"></div>
+                        <div style="width:{{ (failed/total*100)|int }}%;background:#ff4757;"></div>
+                        <div style="width:{{ (untested/total*100)|int }}%;background:#ffd700;"></div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2" style="font-size:10px;">
+                    <span style="color:#00ff88;"><i class="fas fa-check-circle"></i> {{ passed }} Passed</span>
+                    <span style="color:#ff4757;"><i class="fas fa-times-circle"></i> {{ failed }} Failed</span>
+                    <span style="color:#ffd700;"><i class="fas fa-question-circle"></i> {{ untested }} Untested</span>
+                </div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:6px;">Maturity: <span style="color:{{ color }};font-weight:600;">{{ level }}</span></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="tab-content" id="tab-controls">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <input type="text" class="filter-input" placeholder="Search controls..." style="flex:1;min-width:200px;" id="ctrlSearch" oninput="filterControls()">
+        <select class="filter-select" id="fwFilter" onchange="filterControls()"><option value="">All Frameworks</option><option value="NIST">NIST</option><option value="ISO">ISO</option><option value="SOC">SOC 2</option><option value="PCI">PCI</option></select>
+        <select class="filter-select" id="statusCtrlFilter" onchange="filterControls()"><option value="">All Status</option><option value="passed">Passed</option><option value="failed">Failed</option><option value="not_tested">Not Tested</option></select>
+    </div>
+    <div class="card"><div class="table-responsive"><table class="table"><thead><tr><th>Control ID</th><th>Name</th><th>Framework</th><th>Status</th><th>Last Tested</th><th>Evidence</th></tr></thead>
+    <tbody id="controlsBody">
+        {% set controls = [
+            ('AC-1', 'Access Control Policy', 'NIST 800-53', 'passed', '2026-05-15', ['AC-Policy-v3.pdf'], 'AC'),
+            ('AC-2', 'Account Management', 'NIST 800-53', 'passed', '2026-05-14', ['IAM-Audit.xlsx'], 'AC'),
+            ('AC-3', 'Access Enforcement', 'NIST 800-53', 'failed', '2026-05-10', [], 'AC'),
+            ('AU-1', 'Audit and Accountability', 'NIST 800-53', 'passed', '2026-05-12', ['Log-Config.pdf'], 'AU'),
+            ('A.9.1.1', 'Access Control Policy', 'ISO 27001', 'passed', '2026-05-08', ['ISMS-v2.docx'], 'A'),
+            ('A.12.4.1', 'Event Logging', 'ISO 27001', 'failed', '2026-04-28', [], 'A'),
+            ('CC6.1', 'Logical Access Controls', 'SOC 2', 'passed', '2026-05-16', ['Access-Review.pdf'], 'CC'),
+            ('CC7.2', 'Monitor User Activity', 'SOC 2', 'not_tested', '2026-04-20', [], 'CC'),
+            ('10.2.1', 'Access Control', 'PCI DSS', 'passed', '2026-05-11', ['PCI-Report.pdf'], '10'),
+            ('10.5.2', 'Audit Trail Review', 'PCI DSS', 'not_tested', '2026-05-01', [], '10'),
+            ('AU-3', 'Content of Audit Records', 'NIST 800-53', 'passed', '2026-05-09', ['Audit-Schema.pdf'], 'AU'),
+            ('AU-6', 'Audit Review & Analysis', 'NIST 800-53', 'failed', '2026-04-30', [], 'AU'),
+            ('A.18.1.1', 'Compliance with Policies', 'ISO 27001', 'passed', '2026-05-06', ['Compliance-Review.docx'], 'A'),
+            ('CC5.1', 'Control Activities', 'SOC 2', 'passed', '2026-05-13', ['Control-Matrix.xlsx'], 'CC'),
+            ('11.5.1', 'Incident Response Plan', 'PCI DSS', 'passed', '2026-05-03', ['IR-Plan.pdf'], '11'),
+        ] %}
+        {% for cid, name, fw, status, last, ev, cat in controls %}
+        <tr class="ctrl-row" data-fw="{{ fw[:5] }}" data-status="{{ status }}">
+            <td style="font-family:monospace;font-size:11px;color:#a855f7;">{{ cid }}</td>
+            <td style="font-size:12px;">{{ name }}</td>
+            <td style="font-size:11px;color:var(--text-muted);">{{ fw }}</td>
+            <td><span class="status-pill" style="background:{% if status == 'passed' %}rgba(0,255,136,0.15);color:#00ff88{% elif status == 'failed' %}rgba(255,71,87,0.15);color:#ff4757{% else %}rgba(255,215,0,0.15);color:#ffd700{% endif %};">{{ status|replace('_',' ') }}</span></td>
+            <td style="font-size:11px;color:var(--text-muted);">{{ last }}</td>
+            <td>{% if ev %}<span style="padding:2px 6px;background:rgba(0,212,255,0.1);border-radius:3px;font-size:9px;color:#00d4ff;cursor:pointer;">{{ ev|length }} file(s)</span>{% else %}<span style="color:var(--text-muted);font-size:10px;">&mdash;</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </tbody></table></div></div>
+</div>
+
+<div class="tab-content" id="tab-evidence">
+    <div class="row g-3">
+        {% set ev_files = [
+            ('Access Control Policy v3', 'pdf', '450 KB', 'NIST 800-53', 'jdoe', '2026-05-15', '#ff4757'),
+            ('IAM Audit Report', 'xlsx', '1.2 MB', 'NIST 800-53', 'asmith', '2026-05-14', '#00ff88'),
+            ('ISMS Policy Document v2', 'docx', '800 KB', 'ISO 27001', 'bwilson', '2026-05-08', '#00d4ff'),
+            ('SOC 2 Access Review', 'pdf', '2.1 MB', 'SOC 2', 'jdoe', '2026-05-16', '#ff4757'),
+            ('PCI DSS Compliance Report', 'pdf', '3.4 MB', 'PCI DSS', 'asmith', '2026-05-11', '#ff4757'),
+            ('Log Configuration Audit', 'pdf', '230 KB', 'NIST 800-53', 'bwilson', '2026-05-12', '#ff4757'),
+            ('IR Plan v4', 'pdf', '1.8 MB', 'PCI DSS', 'jdoe', '2026-05-03', '#ff4757'),
+            ('Control Matrix SOC2', 'xlsx', '560 KB', 'SOC 2', 'asmith', '2026-05-13', '#00ff88'),
+            ('Compliance Review Q1', 'docx', '920 KB', 'ISO 27001', 'bwilson', '2026-05-06', '#00d4ff'),
+        ] %}
+        {% for name, ext, size, fw, author, date, color in ev_files %}
+        <div class="col-md-4">
+            <div class="evidence-file" onclick="alert('View: {{ name }}')">
+                <div style="width:36px;height:36px;border-radius:8px;background:{{ color }}15;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-file-{{ ext }}" style="color:{{ color }};"></i></div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ name }}</div>
+                    <div style="font-size:10px;color:var(--text-muted);">{{ fw }} &middot; {{ size }} &middot; {{ author }}</div>
+                </div>
+                <div style="font-size:10px;color:var(--text-muted);flex-shrink:0;">{{ date }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+
+function filterControls() {
+    const search = document.getElementById('ctrlSearch').value.toLowerCase();
+    const fw = document.getElementById('fwFilter').value;
+    const status = document.getElementById('statusCtrlFilter').value;
+    document.querySelectorAll('.ctrl-row').forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const rowFw = row.dataset.fw;
+        const rowStatus = row.dataset.status;
+        row.style.display = (!search || text.includes(search)) && (!fw || rowFw === fw) && (!status || rowStatus === status) ? '' : 'none';
+    });
+}
+
+new Chart(document.getElementById('complianceChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: ['NIST 800-53','ISO 27001','SOC 2','PCI DSS','GDPR','HIPAA'],
+        datasets: [
+            { label: 'Passed', data: [92,93,70,67,35,49], backgroundColor: 'rgba(0,255,136,0.5)', borderColor: '#00ff88', borderWidth: 1 },
+            { label: 'Failed', data: [18,12,16,5,10,8], backgroundColor: 'rgba(255,71,87,0.5)', borderColor: '#ff4757', borderWidth: 1 },
+            { label: 'Not Tested', data: [14,9,12,4,7,7], backgroundColor: 'rgba(255,215,0,0.35)', borderColor: '#ffd700', borderWidth: 1 },
+        ]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, usePointStyle: true } } },
+        scales: { x: { stacked: true, ticks: { color: '#64748b', font: { size: 10 } }, grid: { display: false } }, y: { stacked: true, ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' }, max: 124 } }
+    }
+});
+</script>
+{% endblock %}

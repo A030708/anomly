@@ -1,0 +1,641 @@
+{% extends "base.html" %}
+
+{% block title %}MITRE ATT&CK - {{ platform_name }}{% endblock %}
+{% block page_title %}MITRE ATT&CK Framework{% endblock %}
+{% block breadcrumb %}MITRE ATT&CK{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mitre-grid {
+        display: grid;
+        grid-template-columns: repeat(14, 1fr);
+        gap: 4px;
+        overflow-x: auto;
+        min-width: 1100px;
+    }
+    .tactic-col { min-width: 80px; }
+    .tactic-header {
+        background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,102,255,0.1));
+        border: 1px solid rgba(0,212,255,0.25);
+        border-radius: 6px;
+        padding: 8px 6px;
+        text-align: center;
+        font-size: 10px;
+        font-weight: 700;
+        color: #00d4ff;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-height: 52px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+    }
+    .tactic-header:hover {
+        background: linear-gradient(135deg, rgba(0,212,255,0.25), rgba(0,102,255,0.2));
+    }
+    .tactic-count {
+        font-size: 16px;
+        font-weight: 700;
+        color: #ffffff;
+    }
+    .technique-cell {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 5px;
+        padding: 5px 6px;
+        font-size: 9px;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s;
+        margin-bottom: 3px;
+        line-height: 1.3;
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+    }
+    .technique-cell:hover {
+        background: rgba(255,255,255,0.08);
+        border-color: rgba(255,255,255,0.15);
+        color: var(--text-primary);
+        z-index: 5;
+        transform: scale(1.02);
+    }
+    .technique-cell.detected {
+        background: rgba(255,71,87,0.15);
+        border-color: rgba(255,71,87,0.35);
+        color: #ff8a96;
+    }
+    .technique-cell.detected:hover {
+        background: rgba(255,71,87,0.25);
+    }
+    .technique-cell.covered {
+        background: rgba(0,212,255,0.1);
+        border-color: rgba(0,212,255,0.25);
+        color: #7fe8ff;
+    }
+    .technique-cell.covered:hover {
+        background: rgba(0,212,255,0.18);
+    }
+    .technique-cell.hunting {
+        background: rgba(255,215,0,0.1);
+        border-color: rgba(255,215,0,0.25);
+        color: #ffe566;
+    }
+    .technique-cell.partial {
+        background: rgba(168,85,247,0.1);
+        border-color: rgba(168,85,247,0.25);
+        color: #c990ff;
+    }
+    .heat-dot {
+        position: absolute;
+        top: 3px; right: 3px;
+        width: 6px; height: 6px;
+        border-radius: 50%;
+    }
+    .tech-id {
+        font-size: 8px;
+        opacity: 0.6;
+        display: block;
+        margin-top: 1px;
+    }
+    .legend-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+        padding: 12px 16px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        margin-bottom: 16px;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+    .legend-box {
+        width: 14px; height: 14px;
+        border-radius: 3px;
+        flex-shrink: 0;
+    }
+    .technique-detail-panel {
+        position: fixed;
+        right: -400px;
+        top: 60px;
+        bottom: 0;
+        width: 380px;
+        background: var(--bg-secondary);
+        border-left: 1px solid var(--border-color);
+        z-index: 500;
+        transition: right 0.3s ease;
+        overflow-y: auto;
+        padding: 20px;
+    }
+    .technique-detail-panel.open { right: 0; }
+    .mitre-controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+    .ctrl-select {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 7px 12px;
+        font-size: 12px;
+        cursor: pointer;
+    }
+    .ctrl-select option { background: #1a2035; }
+    .coverage-bar {
+        height: 6px;
+        background: rgba(255,255,255,0.07);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .coverage-fill {
+        height: 100%;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #00d4ff, #00ff88);
+    }
+    .stat-pill {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Row -->
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Techniques Detected',  stats.detected,  '#ff4757', 'rgba(255,71,87,0.12)'),
+        ('Coverage (Rules)',     stats.covered,   '#00d4ff', 'rgba(0,212,255,0.12)'),
+        ('Under Hunting',        stats.hunting,   '#ffd700', 'rgba(255,215,0,0.12)'),
+        ('Partial Coverage',     stats.partial,   '#a855f7', 'rgba(168,85,247,0.12)'),
+        ('No Coverage',          stats.no_coverage,'#64748b','rgba(100,116,139,0.12)'),
+        ('Total Techniques',     stats.total,     '#e2e8f0', 'rgba(255,255,255,0.06)'),
+    ] %}
+    {% for label, value, color, bg in kpis %}
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card">
+            <div class="stat-label">{{ label }}</div>
+            <div class="stat-value" style="color:{{ color }};font-size:24px;">{{ value }}</div>
+            <div class="coverage-bar mt-2">
+                <div class="coverage-fill"
+                     style="width:{{ ((value / stats.total) * 100)|int if stats.total else 0 }}%;
+                            background:{{ color }};"></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Controls -->
+<div class="mitre-controls">
+    <select class="ctrl-select" id="viewMode" onchange="changeView()">
+        <option value="coverage">Coverage View</option>
+        <option value="detections">Detections View</option>
+        <option value="heatmap">Heatmap</option>
+    </select>
+    <select class="ctrl-select" id="filterMode" onchange="renderGrid()">
+        <option value="all">All Techniques</option>
+        <option value="detected">Detected Only</option>
+        <option value="covered">Covered Only</option>
+        <option value="no-coverage">No Coverage</option>
+    </select>
+    <select class="ctrl-select" id="timeRange">
+        <option value="7d">Last 7 Days</option>
+        <option value="30d">Last 30 Days</option>
+        <option value="90d">Last 90 Days</option>
+    </select>
+    <button onclick="exportMitre()"
+            style="padding:7px 16px;background:rgba(255,255,255,0.05);
+                   border:1px solid rgba(255,255,255,0.1);color:var(--text-muted);
+                   border-radius:8px;font-size:12px;cursor:pointer;">
+        <i class="fas fa-download me-1"></i> Export Navigator
+    </button>
+    <button onclick="resetHighlight()"
+            style="padding:7px 16px;background:rgba(255,255,255,0.05);
+                   border:1px solid rgba(255,255,255,0.1);color:var(--text-muted);
+                   border-radius:8px;font-size:12px;cursor:pointer;">
+        <i class="fas fa-rotate me-1"></i> Reset
+    </button>
+    <div class="ms-auto">
+        <span style="font-size:12px;color:var(--text-muted);">
+            <i class="fas fa-info-circle me-1"></i>
+            Click any technique for details
+        </span>
+    </div>
+</div>
+
+<!-- Legend -->
+<div class="legend-bar">
+    <span style="font-size:11px;color:var(--text-muted);font-weight:600;">Legend:</span>
+    <div class="legend-item">
+        <div class="legend-box" style="background:rgba(255,71,87,0.4);border:1px solid #ff4757;"></div>
+        <span>Detected / Active Threat</span>
+    </div>
+    <div class="legend-item">
+        <div class="legend-box" style="background:rgba(0,212,255,0.3);border:1px solid #00d4ff;"></div>
+        <span>Detection Rule Coverage</span>
+    </div>
+    <div class="legend-item">
+        <div class="legend-box" style="background:rgba(255,215,0,0.25);border:1px solid #ffd700;"></div>
+        <span>Active Hunting</span>
+    </div>
+    <div class="legend-item">
+        <div class="legend-box" style="background:rgba(168,85,247,0.25);border:1px solid #a855f7;"></div>
+        <span>Partial Coverage</span>
+    </div>
+    <div class="legend-item">
+        <div class="legend-box" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);"></div>
+        <span>No Coverage</span>
+    </div>
+</div>
+
+<!-- ATT&CK Matrix -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="fas fa-chess-board" style="color:#a855f7;"></i>
+        <span class="card-title">MITRE ATT&CK Matrix — Enterprise v14</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">14 Tactics · 193 Techniques</span>
+    </div>
+    <div class="card-body" style="overflow-x:auto;padding:16px;">
+        <div class="mitre-grid" id="mitreGrid"></div>
+    </div>
+</div>
+
+<!-- Bottom Stats -->
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-chart-bar" style="color:#ff4757;"></i><span class="card-title">Top Detected Tactics</span></div>
+            <div class="card-body">
+                {% set tactic_counts = [
+                    ('Defense Evasion',     15, '#ff4757'),
+                    ('Discovery',           11, '#ff6b35'),
+                    ('Execution',           12, '#ffd700'),
+                    ('Credential Access',    9, '#00d4ff'),
+                    ('Lateral Movement',     4, '#a855f7'),
+                    ('Initial Access',       8, '#00ff88'),
+                    ('Persistence',          5, '#ff6b35'),
+                ] %}
+                {% for tactic, count, color in tactic_counts %}
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <div style="width:120px;font-size:11px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ tactic }}</div>
+                    <div style="flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
+                        <div style="width:{{ (count/15*100)|int }}%;height:100%;background:{{ color }};border-radius:3px;"></div>
+                    </div>
+                    <div style="font-size:11px;color:{{ color }};font-weight:700;width:20px;text-align:right;">{{ count }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-fire" style="color:#ff6b35;"></i><span class="card-title">Recently Detected Techniques</span></div>
+            <div class="card-body" style="padding:12px 16px;">
+                {% set recent_techs = [
+                    ('T1059.001', 'PowerShell',              'Execution',        '#ff4757', '2m ago'),
+                    ('T1055',     'Process Injection',        'Defense Evasion',  '#ff4757', '15m ago'),
+                    ('T1078',     'Valid Accounts',            'Initial Access',   '#ffd700', '1h ago'),
+                    ('T1021.001', 'Remote Desktop Protocol',  'Lateral Movement', '#ffd700', '2h ago'),
+                    ('T1003.001', 'LSASS Memory',             'Credential Access','#ff4757', '3h ago'),
+                    ('T1486',     'Data Encrypted for Impact','Impact',           '#ff6b35', '5h ago'),
+                ] %}
+                {% for tid, name, tactic, color, time in recent_techs %}
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+                    <div style="padding:2px 7px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2);border-radius:4px;font-size:9px;font-family:monospace;color:#a855f7;flex-shrink:0;">{{ tid }}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:12px;font-weight:500;color:{{ color }};">{{ name }}</div>
+                        <div style="font-size:10px;color:var(--text-muted);">{{ tactic }}</div>
+                    </div>
+                    <div style="font-size:10px;color:var(--text-muted);flex-shrink:0;">{{ time }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-shield-check" style="color:#00ff88;"></i><span class="card-title">Coverage Summary</span></div>
+            <div class="card-body">
+                <div style="text-align:center;margin-bottom:16px;">
+                    <div style="font-size:42px;font-weight:700;color:#00d4ff;">{{ stats.coverage_pct or 68 }}%</div>
+                    <div style="font-size:12px;color:var(--text-muted);">Overall Detection Coverage</div>
+                </div>
+                <canvas id="coverageRadar" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Technique Detail Side Panel -->
+<div class="technique-detail-panel" id="techDetailPanel">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <span style="font-size:14px;font-weight:600;color:#00d4ff;">Technique Details</span>
+        <button onclick="closeTechPanel()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="techDetailContent">
+        <div class="empty-state"><i class="fas fa-chess-board"></i><p>Click a technique to view details</p></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const tactics = [
+    { id: 'TA0001', name: 'Initial\nAccess',      short: 'Initial Access' },
+    { id: 'TA0002', name: 'Execution',             short: 'Execution' },
+    { id: 'TA0003', name: 'Persistence',           short: 'Persistence' },
+    { id: 'TA0004', name: 'Privilege\nEscalation', short: 'Priv. Escalation' },
+    { id: 'TA0005', name: 'Defense\nEvasion',      short: 'Defense Evasion' },
+    { id: 'TA0006', name: 'Credential\nAccess',    short: 'Credential Access' },
+    { id: 'TA0007', name: 'Discovery',             short: 'Discovery' },
+    { id: 'TA0008', name: 'Lateral\nMovement',     short: 'Lateral Movement' },
+    { id: 'TA0009', name: 'Collection',            short: 'Collection' },
+    { id: 'TA0010', name: 'Exfiltration',          short: 'Exfiltration' },
+    { id: 'TA0011', name: 'C2',                    short: 'Command & Control' },
+    { id: 'TA0040', name: 'Impact',                short: 'Impact' },
+    { id: 'TA0042', name: 'Resource\nDevelopment', short: 'Resource Dev.' },
+    { id: 'TA0043', name: 'Reconnais-\nsance',     short: 'Reconnaissance' },
+];
+
+const techniques = {
+    TA0001: [
+        { id:'T1566',     name:'Phishing',               status:'detected' },
+        { id:'T1078',     name:'Valid Accounts',          status:'detected' },
+        { id:'T1190',     name:'Exploit Public App',      status:'covered'  },
+        { id:'T1133',     name:'External Remote Services',status:'covered'  },
+        { id:'T1200',     name:'Hardware Additions',      status:'none'     },
+        { id:'T1091',     name:'Replication via USB',     status:'none'     },
+        { id:'T1195',     name:'Supply Chain Compromise', status:'partial'  },
+        { id:'T1199',     name:'Trusted Relationship',    status:'hunting'  },
+        { id:'T1659',     name:'Content Injection',       status:'none'     },
+    ],
+    TA0002: [
+        { id:'T1059',     name:'Command & Scripting',     status:'detected' },
+        { id:'T1059.001', name:'PowerShell',              status:'detected' },
+        { id:'T1059.003', name:'Windows Cmd Shell',       status:'covered'  },
+        { id:'T1059.005', name:'Visual Basic',            status:'covered'  },
+        { id:'T1059.007', name:'JavaScript',              status:'partial'  },
+        { id:'T1203',     name:'Exploitation for Exec',   status:'covered'  },
+        { id:'T1106',     name:'Native API',              status:'hunting'  },
+        { id:'T1053',     name:'Scheduled Task/Job',      status:'covered'  },
+        { id:'T1047',     name:'WMI',                     status:'detected' },
+        { id:'T1569',     name:'System Services',         status:'covered'  },
+        { id:'T1204',     name:'User Execution',          status:'detected' },
+        { id:'T1072',     name:'Software Deploy Tools',   status:'none'     },
+    ],
+    TA0003: [
+        { id:'T1547',     name:'Boot/Logon Autostart',    status:'covered'  },
+        { id:'T1543',     name:'Create/Modify Sys Proc',  status:'covered'  },
+        { id:'T1546',     name:'Event Triggered Exec',    status:'partial'  },
+        { id:'T1574',     name:'Hijack Exec Flow',        status:'hunting'  },
+        { id:'T1525',     name:'Implant Container Image', status:'none'     },
+        { id:'T1505',     name:'Server Software Comp.',   status:'partial'  },
+        { id:'T1037',     name:'Boot/Logon Init Scripts', status:'covered'  },
+        { id:'T1176',     name:'Browser Extensions',      status:'none'     },
+    ],
+    TA0004: [
+        { id:'T1548',     name:'Abuse Elevation Control', status:'covered'  },
+        { id:'T1134',     name:'Access Token Manip.',     status:'detected' },
+        { id:'T1068',     name:'Exploit Priv. Escalation',status:'covered'  },
+        { id:'T1055',     name:'Process Injection',       status:'detected' },
+        { id:'T1053',     name:'Scheduled Task/Job',      status:'covered'  },
+        { id:'T1078',     name:'Valid Accounts',          status:'detected' },
+        { id:'T1611',     name:'Escape to Host',          status:'none'     },
+    ],
+    TA0005: [
+        { id:'T1140',     name:'Deobfuscate/Decode',      status:'covered'  },
+        { id:'T1070',     name:'Indicator Removal',       status:'detected' },
+        { id:'T1036',     name:'Masquerading',            status:'detected' },
+        { id:'T1112',     name:'Modify Registry',         status:'covered'  },
+        { id:'T1055',     name:'Process Injection',       status:'detected' },
+        { id:'T1207',     name:'Rogue Domain Controller', status:'none'     },
+        { id:'T1014',     name:'Rootkit',                 status:'hunting'  },
+        { id:'T1218',     name:'Signed Binary Proxy',     status:'detected' },
+        { id:'T1216',     name:'Signed Script Proxy',     status:'covered'  },
+        { id:'T1553',     name:'Subvert Trust Controls',  status:'partial'  },
+        { id:'T1221',     name:'Template Injection',      status:'none'     },
+        { id:'T1205',     name:'Traffic Signaling',       status:'hunting'  },
+        { id:'T1127',     name:'Trusted Dev Utilities',   status:'covered'  },
+        { id:'T1535',     name:'Unused Cloud Regions',    status:'none'     },
+        { id:'T1550',     name:'Use Alt Auth Material',   status:'detected' },
+    ],
+    TA0006: [
+        { id:'T1110',     name:'Brute Force',             status:'detected' },
+        { id:'T1555',     name:'Credentials from Stores', status:'covered'  },
+        { id:'T1212',     name:'Exploit Credential Access',status:'covered' },
+        { id:'T1187',     name:'Forced Authentication',   status:'hunting'  },
+        { id:'T1606',     name:'Forge Web Credentials',   status:'none'     },
+        { id:'T1056',     name:'Input Capture',           status:'partial'  },
+        { id:'T1557',     name:'Adversary-in-the-Middle', status:'hunting'  },
+        { id:'T1003',     name:'OS Credential Dumping',   status:'detected' },
+        { id:'T1003.001', name:'LSASS Memory',            status:'detected' },
+    ],
+    TA0007: [
+        { id:'T1087',     name:'Account Discovery',       status:'covered'  },
+        { id:'T1010',     name:'App Window Discovery',    status:'none'     },
+        { id:'T1217',     name:'Browser Bookmark Disc.',  status:'none'     },
+        { id:'T1482',     name:'Domain Trust Discovery',  status:'covered'  },
+        { id:'T1083',     name:'File & Dir Discovery',    status:'covered'  },
+        { id:'T1046',     name:'Network Svc Discovery',   status:'detected' },
+        { id:'T1135',     name:'Network Share Discovery', status:'covered'  },
+        { id:'T1040',     name:'Network Sniffing',        status:'detected' },
+        { id:'T1201',     name:'Password Policy Disc.',   status:'covered'  },
+        { id:'T1120',     name:'Peripheral Disc.',        status:'none'     },
+        { id:'T1069',     name:'Permission Groups Disc.', status:'covered'  },
+    ],
+    TA0008: [
+        { id:'T1210',     name:'Exploit Remote Svcs',     status:'covered'  },
+        { id:'T1534',     name:'Internal Spearphishing',  status:'hunting'  },
+        { id:'T1570',     name:'Lateral Tool Transfer',   status:'covered'  },
+        { id:'T1563',     name:'Remote Svc Session Hijack',status:'partial' },
+        { id:'T1021',     name:'Remote Services',         status:'detected' },
+        { id:'T1021.001', name:'RDP',                     status:'detected' },
+        { id:'T1080',     name:'Taint Shared Content',    status:'none'     },
+    ],
+    TA0009: [
+        { id:'T1560',     name:'Archive Collected Data',  status:'hunting'  },
+        { id:'T1123',     name:'Audio Capture',           status:'none'     },
+        { id:'T1119',     name:'Automated Collection',    status:'covered'  },
+        { id:'T1115',     name:'Clipboard Data',          status:'covered'  },
+        { id:'T1530',     name:'Data from Cloud Storage', status:'partial'  },
+        { id:'T1213',     name:'Data from Info Repos',    status:'none'     },
+        { id:'T1005',     name:'Data from Local System',  status:'covered'  },
+        { id:'T1039',     name:'Data from Network Share', status:'covered'  },
+    ],
+    TA0010: [
+        { id:'T1020',     name:'Automated Exfiltration',  status:'hunting'  },
+        { id:'T1030',     name:'Data Transfer Size Limits',status:'none'    },
+        { id:'T1048',     name:'Exfil Over Alt Protocol', status:'covered'  },
+        { id:'T1041',     name:'Exfil Over C2 Channel',   status:'covered'  },
+        { id:'T1011',     name:'Exfil Over Other Medium', status:'none'     },
+        { id:'T1052',     name:'Exfil Over Physical Med.',status:'none'     },
+        { id:'T1567',     name:'Exfil Over Web Service',  status:'hunting'  },
+    ],
+    TA0011: [
+        { id:'T1071',     name:'App Layer Protocol',      status:'covered'  },
+        { id:'T1092',     name:'Communication via USB',   status:'none'     },
+        { id:'T1132',     name:'Data Encoding',           status:'covered'  },
+        { id:'T1001',     name:'Data Obfuscation',        status:'hunting'  },
+        { id:'T1568',     name:'Dynamic Resolution',      status:'detected' },
+        { id:'T1573',     name:'Encrypted Channel',       status:'covered'  },
+        { id:'T1008',     name:'Fallback Channels',       status:'none'     },
+        { id:'T1105',     name:'Ingress Tool Transfer',   status:'detected' },
+        { id:'T1104',     name:'Multi-Stage Channels',    status:'partial'  },
+        { id:'T1095',     name:'Non-App Layer Protocol',  status:'covered'  },
+    ],
+    TA0040: [
+        { id:'T1485',     name:'Data Destruction',        status:'covered'  },
+        { id:'T1486',     name:'Data Encrypted (Impact)', status:'detected' },
+        { id:'T1491',     name:'Defacement',              status:'covered'  },
+        { id:'T1561',     name:'Disk Wipe',               status:'covered'  },
+        { id:'T1499',     name:'Endpoint DoS',            status:'covered'  },
+        { id:'T1495',     name:'Firmware Corruption',     status:'none'     },
+        { id:'T1490',     name:'Inhibit System Recovery', status:'detected' },
+        { id:'T1498',     name:'Network DoS',             status:'covered'  },
+        { id:'T1496',     name:'Resource Hijacking',      status:'hunting'  },
+        { id:'T1489',     name:'Service Stop',            status:'covered'  },
+    ],
+    TA0042: [
+        { id:'T1583',     name:'Acquire Infrastructure',  status:'none'     },
+        { id:'T1586',     name:'Compromise Accounts',     status:'none'     },
+        { id:'T1584',     name:'Compromise Infrastructure',status:'none'    },
+        { id:'T1587',     name:'Develop Capabilities',    status:'none'     },
+        { id:'T1585',     name:'Establish Accounts',      status:'none'     },
+        { id:'T1588',     name:'Obtain Capabilities',     status:'none'     },
+    ],
+    TA0043: [
+        { id:'T1595',     name:'Active Scanning',         status:'covered'  },
+        { id:'T1592',     name:'Gather Host Info',        status:'none'     },
+        { id:'T1589',     name:'Gather Victim ID',        status:'none'     },
+        { id:'T1590',     name:'Gather Victim Net Info',  status:'none'     },
+        { id:'T1591',     name:'Gather Victim Org Info',  status:'none'     },
+        { id:'T1598',     name:'Phishing for Info',       status:'covered'  },
+        { id:'T1597',     name:'Search Closed Sources',   status:'none'     },
+        { id:'T1596',     name:'Search Open Tech Dbs',    status:'none'     },
+    ],
+};
+
+function renderGrid() {
+    const grid = document.getElementById('mitreGrid');
+    grid.innerHTML = '';
+    const filterMode = document.getElementById('filterMode').value;
+
+    tactics.forEach(tactic => {
+        const col = document.createElement('div');
+        col.className = 'tactic-col';
+        const techs = techniques[tactic.id] || [];
+        const detectedCount = techs.filter(t => t.status === 'detected').length;
+
+        const header = document.createElement('div');
+        header.className = 'tactic-header';
+        header.innerHTML = `<div class="tactic-count">${detectedCount > 0 ? detectedCount : ''}</div><div style="line-height:1.2;white-space:pre-line;">${tactic.name}</div>`;
+        if (detectedCount > 0) {
+            header.style.borderColor = 'rgba(255,71,87,0.4)';
+            header.style.background  = 'linear-gradient(135deg,rgba(255,71,87,0.15),rgba(255,71,87,0.05))';
+            header.style.color       = '#ff8a96';
+        }
+        col.appendChild(header);
+
+        techs.forEach(tech => {
+            if (filterMode !== 'all' && tech.status !== filterMode && !(filterMode === 'no-coverage' && tech.status === 'none')) return;
+
+            const cell = document.createElement('div');
+            cell.className = `technique-cell ${tech.status === 'none' ? '' : tech.status}`;
+            cell.innerHTML = `${tech.name}<span class="tech-id">${tech.id}</span><div class="heat-dot" style="background:${tech.status === 'detected' ? '#ff4757' : tech.status === 'covered' ? '#00d4ff' : tech.status === 'hunting' ? '#ffd700' : tech.status === 'partial' ? '#a855f7' : 'transparent'};"></div>`;
+            cell.addEventListener('click', () => showTechDetail(tech, tactic));
+            col.appendChild(cell);
+        });
+
+        grid.appendChild(col);
+    });
+}
+
+renderGrid();
+
+function showTechDetail(tech, tactic) {
+    const panel = document.getElementById('techDetailPanel');
+    const content = document.getElementById('techDetailContent');
+    panel.classList.add('open');
+
+    const statusInfo = {
+        detected: { color: '#ff4757', label: 'Active Detections',       bg: 'rgba(255,71,87,0.15)' },
+        covered:  { color: '#00d4ff', label: 'Rule Coverage Active',    bg: 'rgba(0,212,255,0.12)' },
+        hunting:  { color: '#ffd700', label: 'Under Active Hunting',    bg: 'rgba(255,215,0,0.12)' },
+        partial:  { color: '#a855f7', label: 'Partial Coverage',        bg: 'rgba(168,85,247,0.12)' },
+        none:     { color: '#64748b', label: 'No Coverage',             bg: 'rgba(100,116,139,0.1)' },
+    };
+    const si = statusInfo[tech.status] || statusInfo.none;
+
+    content.innerHTML = `
+        <div style="margin-bottom:16px;">
+            <div style="font-family:monospace;font-size:11px;color:#a855f7;margin-bottom:4px;">${tech.id}</div>
+            <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">${tech.name}</div>
+            <div style="padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;display:inline-block;background:${si.bg};color:${si.color};">${si.label}</div>
+        </div>
+        <div style="margin-bottom:16px;">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Tactic</div>
+            <div style="padding:4px 10px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);border-radius:5px;font-size:12px;color:#00d4ff;display:inline-block;">${tactic.short}</div>
+        </div>
+        <div style="margin-bottom:16px;">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Detection Rules</div>
+            ${tech.status === 'none' ? '<div style="font-size:12px;color:var(--text-muted);">No detection rules configured</div>' : `<div style="display:flex;flex-direction:column;gap:6px;">${['Sigma Rule: ' + tech.id + '_detect', 'Elastic Rule: endpoint_' + tech.id.toLowerCase()].map(r => `<div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);border-radius:5px;padding:6px 10px;font-size:11px;font-family:monospace;color:#00ff88;">${r}</div>`).join('')}</div>`}
+        </div>
+        <div style="margin-bottom:16px;">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Recent Activity</div>
+            ${tech.status === 'detected' ? '<div style="font-size:12px;color:#ff4757;"><i class="fas fa-exclamation-circle me-1"></i>3 detections in last 24h</div>' : '<div style="font-size:12px;color:var(--text-muted);">No recent activity</div>'}
+        </div>
+        <div style="margin-bottom:16px;">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Mitigations</div>
+            <div style="font-size:11px;color:var(--text-secondary);line-height:1.6;">&bull; Application control policies<br>&bull; Privileged account management<br>&bull; Multi-factor authentication<br>&bull; Network segmentation</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+            <a href="https://attack.mitre.org/techniques/${tech.id.replace('.','/')}/" target="_blank" style="padding:8px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2);color:#a855f7;border-radius:7px;font-size:12px;text-decoration:none;text-align:center;"><i class="fas fa-external-link-alt me-1"></i> View on MITRE ATT&CK</a>
+            <button onclick="alert('Creating hunt query for ${tech.id}')" style="padding:8px;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.2);color:#ffd700;border-radius:7px;font-size:12px;cursor:pointer;"><i class="fas fa-magnifying-glass me-1"></i> Create Hunt Query</button>
+            <button onclick="alert('Creating detection rule for ${tech.id}')" style="padding:8px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;border-radius:7px;font-size:12px;cursor:pointer;"><i class="fas fa-bell me-1"></i> Create Detection Rule</button>
+        </div>`;
+}
+
+function closeTechPanel() { document.getElementById('techDetailPanel').classList.remove('open'); }
+function changeView()    { renderGrid(); }
+function resetHighlight(){ document.getElementById('filterMode').value = 'all'; renderGrid(); }
+function exportMitre()   { alert('Export ATT&CK Navigator JSON layer'); }
+
+new Chart(document.getElementById('coverageRadar').getContext('2d'), {
+    type: 'radar',
+    data: {
+        labels: ['Initial Access','Execution','Persistence','Priv. Esc.','Def. Evasion','Credential','Discovery','Lateral Mov.','Exfiltration','C2','Impact'],
+        datasets: [
+            { label: 'Coverage', data: [65,80,45,70,55,90,75,60,50,85,70], borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,0.1)', borderWidth:2, pointBackgroundColor:'#00d4ff', pointRadius:3 },
+            { label: 'Detections', data: [40,60,20,50,70,80,55,30,25,45,60], borderColor:'#ff4757', backgroundColor:'rgba(255,71,87,0.08)', borderWidth:2, pointBackgroundColor:'#ff4757', pointRadius:3 },
+        ]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position:'bottom', labels: { color:'#64748b', font:{size:10}, boxWidth:10, padding:8 } } },
+        scales: { r: { min:0, max:100, ticks:{display:false}, grid:{color:'rgba(255,255,255,0.06)'}, angleLines:{color:'rgba(255,255,255,0.06)'}, pointLabels:{color:'#64748b', font:{size:9}} } }
+    }
+});
+</script>
+{% endblock %}

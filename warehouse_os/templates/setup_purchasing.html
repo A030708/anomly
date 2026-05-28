@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Database Setup{% endblock %}
+{% block header_title %}Database Setup{% endblock %}
+{% block content %}
+
+<h1 class="wos-page-title" style="margin-bottom: 8px;">Setup Purchasing Tables</h1>
+<p style="color: var(--wos-text-muted); margin-bottom: 24px;">Create the required database tables for suppliers, purchase orders, and PO items.</p>
+
+{% if tables_exist %}
+<div style="background: #dcfce7; border: 1px solid #86efac; border-radius: var(--wos-radius-md); padding: 24px; text-align: center; margin-bottom: 24px; max-width: 600px;">
+    <i class="fa-solid fa-circle-check" style="font-size: 48px; color: #16a34a; margin-bottom: 12px; display: block;"></i>
+    <h3 style="font-size: 18px; font-weight: 700; color: #166534;">All Tables Ready</h3>
+    <p style="color: #15803d; font-size: 14px; margin-top: 4px;">suppliers, purchase_orders, and purchase_order_items exist.</p>
+    <a href="{{ url_for('purchase_orders_list') }}" class="wos-btn wos-btn-primary" style="margin-top: 16px;">
+        <i class="fa-solid fa-arrow-right"></i> Go to Purchase Orders
+    </a>
+</div>
+{% else %}
+<div style="max-width: 600px;">
+    <div class="wos-card" style="padding: 24px; margin-bottom: 20px;">
+        <i class="fa-solid fa-database" style="font-size: 36px; color: var(--wos-accent); margin-bottom: 12px; display: block;"></i>
+        <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 8px;">Tables Need to Be Created</h3>
+        <p style="font-size: 13px; color: var(--wos-text-muted); margin-bottom: 16px;">
+            Open your <strong>Supabase Dashboard</strong> → <strong>SQL Editor</strong>, paste the SQL below, and click <strong>Run</strong>.
+        </p>
+
+        <div style="background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: var(--wos-radius-md); font-family: monospace; font-size: 12px; line-height: 1.6; overflow-x: auto; white-space: pre; margin-bottom: 16px; max-height: 400px; overflow-y: auto;">{{ setup_sql }}</div>
+
+        <div style="display: flex; gap: 8px;">
+            <form method="POST" style="flex: 1;">
+                <input type="hidden" name="action" value="create">
+                <button type="submit" class="wos-btn wos-btn-primary" style="width: 100%; padding: 10px;">
+                    <i class="fa-solid fa-play"></i> Auto-Create (API)
+                </button>
+            </form>
+            <form method="POST" style="flex: 1;">
+                <input type="hidden" name="action" value="verify">
+                <button type="submit" class="wos-btn wos-btn-secondary" style="width: 100%; padding: 10px;">
+                    <i class="fa-solid fa-check"></i> Verify After Running
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

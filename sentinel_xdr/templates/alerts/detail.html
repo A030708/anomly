@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Alert #{{ alert.id }} - {{ platform_name }}{% endblock %}
+{% block page_title %}Alert Detail{% endblock %}
+{% block breadcrumb %}
+    <a href="{{ url_for('alerts.list_alerts') }}" style="color:#00d4ff;text-decoration:none;">Alerts</a> / #{{ alert.id }}
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Main Detail -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-bell" style="color:#ff4757;"></i>
+                <span class="card-title">{{ alert.title }}</span>
+                <span class="severity-badge severity-{{ alert.severity|lower }} ms-2">
+                    {{ alert.severity }}
+                </span>
+                <span class="status-badge status-{{ alert.status|lower }} ms-1">
+                    {{ alert.status }}
+                </span>
+            </div>
+            <div class="card-body">
+                <!-- Description -->
+                <div class="mb-4">
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Description</div>
+                    <p style="color:var(--text-secondary);font-size:14px;line-height:1.7;">
+                        {{ alert.description or 'No description provided.' }}
+                    </p>
+                </div>
+
+                <!-- Details Grid -->
+                <div class="row g-3 mb-4">
+                    {% set details = [
+                        ('Alert ID', '#' ~ alert.id, 'fas fa-hashtag'),
+                        ('Alert Type', alert.alert_type, 'fas fa-tag'),
+                        ('Source IP', alert.source_ip or 'N/A', 'fas fa-network-wired'),
+                        ('Destination IP', alert.dest_ip or 'N/A', 'fas fa-bullseye'),
+                        ('Source Port', alert.source_port or 'N/A', 'fas fa-plug'),
+                        ('Protocol', alert.protocol or 'N/A', 'fas fa-code-branch'),
+                        ('Detection Rule', alert.rule_name or 'N/A', 'fas fa-ruler'),
+                        ('Confidence', (alert.confidence|string ~ '%') if alert.confidence else 'N/A', 'fas fa-percentage'),
+                    ] %}
+                    {% for label, value, icon in details %}
+                    <div class="col-md-6">
+                        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">
+                                <i class="{{ icon }} me-1"></i>{{ label }}
+                            </div>
+                            <div style="font-size:14px;font-weight:500;font-family:{{ 'monospace' if 'IP' in label or 'Port' in label else 'inherit' }};">
+                                {{ value }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Raw Log -->
+                {% if alert.raw_log %}
+                <div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Raw Log</div>
+                    <pre style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:14px;font-size:11px;color:#00ff88;overflow-x:auto;max-height:200px;">{{ alert.raw_log }}</pre>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-timeline" style="color:#00d4ff;"></i>
+                <span class="card-title">Alert Timeline</span>
+            </div>
+            <div class="card-body">
+                <div style="position:relative;padding-left:20px;border-left:2px solid rgba(255,255,255,0.08);">
+                    {% set timeline = [
+                        ('Alert Generated', alert.created_at, 'fas fa-bell', '#ff4757'),
+                        ('Alert Triaged', alert.created_at, 'fas fa-eye', '#ffd700'),
+                        ('Under Investigation', None, 'fas fa-magnifying-glass', '#00d4ff'),
+                        ('Resolved', alert.resolved_at if alert.status == 'resolved' else None, 'fas fa-check-circle', '#00ff88'),
+                    ] %}
+                    {% for event, ts, icon, color in timeline %}
+                    <div style="margin-bottom:20px;position:relative;">
+                        <div style="position:absolute;left:-26px;width:12px;height:12px;border-radius:50%;background:{{ color if ts else 'rgba(255,255,255,0.1)' }};border:2px solid var(--bg-card);"></div>
+                        <div style="font-size:13px;font-weight:500;color:{{ color if ts else 'var(--text-muted)' }};">{{ event }}</div>
+                        <div style="font-size:11px;color:var(--text-muted);">
+                            {{ ts.strftime('%Y-%m-%d %H:%M:%S') if ts else 'Pending' }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Actions -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-bolt" style="color:#ffd700;"></i>
+                <span class="card-title">Actions</span>
+            </div>
+            <div class="card-body d-grid gap-2">
+                {% if alert.status != 'resolved' %}
+                <a href="{{ url_for('alerts.resolve_alert', alert_id=alert.id) }}"
+                   class="btn-primary-custom justify-content-center"
+                   style="background:linear-gradient(135deg,#00ff88,#00cc66);">
+                    <i class="fas fa-check-circle"></i> Mark Resolved
+                </a>
+                {% endif %}
+                <a href="{{ url_for('incidents.create_incident') }}?alert_id={{ alert.id }}"
+                   class="btn-primary-custom justify-content-center"
+                   style="background:rgba(255,107,53,0.2);border:1px solid rgba(255,107,53,0.3);color:#ff6b35;">
+                    <i class="fas fa-fire"></i> Create Incident
+                </a>
+                <a href="{{ url_for('cases.create_case') }}?alert_id={{ alert.id }}"
+                   class="btn-primary-custom justify-content-center"
+                   style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);color:#a855f7;">
+                    <i class="fas fa-folder-plus"></i> Add to Case
+                </a>
+                <button class="btn-primary-custom justify-content-center"
+                        style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);"
+                        onclick="window.print()">
+                    <i class="fas fa-print"></i> Export PDF
+                </button>
+            </div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-info-circle" style="color:#00d4ff;"></i>
+                <span class="card-title">Metadata</span>
+            </div>
+            <div class="card-body">
+                {% set meta = [
+                    ('Created', alert.created_at.strftime('%Y-%m-%d %H:%M') if alert.created_at else 'N/A'),
+                    ('Updated', alert.updated_at.strftime('%Y-%m-%d %H:%M') if alert.updated_at else 'N/A'),
+                    ('Assigned To', alert.assigned_to or 'Unassigned'),
+                    ('False Positive', 'Yes' if alert.false_positive else 'No'),
+                    ('MITRE Tactic', alert.mitre_tactic or 'N/A'),
+                    ('MITRE Technique', alert.mitre_technique or 'N/A'),
+                ] %}
+                {% for label, value in meta %}
+                <div class="d-flex justify-content-between py-2"
+                     style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                    <span style="font-size:12px;color:var(--text-muted);">{{ label }}</span>
+                    <span style="font-size:12px;color:var(--text-secondary);font-weight:500;">{{ value }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Related Alerts -->
+        {% if related_alerts %}
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-link" style="color:#a855f7;"></i>
+                <span class="card-title">Related Alerts</span>
+            </div>
+            <div class="card-body" style="padding:10px;">
+                {% for rel in related_alerts %}
+                <a href="{{ url_for('alerts.alert_detail', alert_id=rel.id) }}"
+                   style="display:block;padding:10px;border-radius:8px;text-decoration:none;margin-bottom:4px;transition:background 0.2s;"
+                   onmouseover="this.style.background='rgba(255,255,255,0.04)'"
+                   onmouseout="this.style.background='transparent'">
+                    <div style="font-size:12px;font-weight:500;color:var(--text-primary);">
+                        {{ rel.title[:40] }}...
+                    </div>
+                    <div class="d-flex gap-2 mt-1">
+                        <span class="severity-badge severity-{{ rel.severity|lower }}">{{ rel.severity }}</span>
+                        <span style="font-size:10px;color:var(--text-muted);">
+                            {{ rel.created_at.strftime('%H:%M') if rel.created_at else '' }}
+                        </span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

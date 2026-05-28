@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}Incidents - {{ platform_name }}{% endblock %}
+{% block page_title %}Incident Management{% endblock %}
+{% block breadcrumb %}Incidents{% endblock %}
+
+{% block extra_css %}
+<style>
+    .incident-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+    }
+    .incident-card::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 4px;
+    }
+    .incident-card.critical::before { background: #ff4757; }
+    .incident-card.high::before    { background: #ff6b35; }
+    .incident-card.medium::before  { background: #ffd700; }
+    .incident-card.low::before     { background: #00d4ff; }
+    .incident-card:hover {
+        background: var(--bg-card-hover);
+        border-color: rgba(255,255,255,0.12);
+        transform: translateY(-1px);
+    }
+    .incident-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+    }
+    .incident-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+    }
+    .incident-meta span { display: flex; align-items: center; gap: 4px; }
+    .progress-mini {
+        height: 4px;
+        background: rgba(255,255,255,0.07);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 10px;
+    }
+    .progress-mini-fill {
+        height: 100%;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #00d4ff, #0066ff);
+    }
+    .view-toggle {
+        display: flex;
+        gap: 4px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 8px;
+        padding: 3px;
+    }
+    .toggle-btn {
+        padding: 5px 12px;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .toggle-btn.active {
+        background: rgba(0,212,255,0.15);
+        color: #00d4ff;
+    }
+    .filter-bar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+    }
+    .filter-input {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        outline: none;
+    }
+    .filter-input:focus { border-color: #00d4ff; }
+    .filter-input::placeholder { color: rgba(255,255,255,0.35); }
+    .filter-select {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        cursor: pointer;
+    }
+    .filter-select option { background: #1a2035; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Row -->
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Total Incidents', stats.total, '#e2e8f0', 'fas fa-fire', 'rgba(255,107,53,0.1)'),
+        ('Open', stats.open, '#ff4757', 'fas fa-folder-open', 'rgba(255,71,87,0.1)'),
+        ('Resolved', stats.resolved, '#00ff88', 'fas fa-check-circle', 'rgba(0,255,136,0.1)'),
+    ] %}
+    {% for label, value, color, icon, bg in kpis %}
+    <div class="col">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:24px;">{{ value }}</div>
+                </div>
+                <div class="stat-icon" style="background:{{ bg }};">
+                    <i class="{{ icon }}" style="color:{{ color }};"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Filter + View Toggle -->
+<div class="filter-bar">
+    <i class="fas fa-filter" style="color:var(--text-muted);"></i>
+    <input type="text" class="filter-input" id="searchInput"
+           placeholder="Search incidents..." style="flex:1;min-width:200px;">
+    <select class="filter-select" id="severityFilter">
+        <option value="">All Severities</option>
+        <option>Critical</option><option>High</option>
+        <option>Medium</option><option>Low</option>
+    </select>
+    <select class="filter-select" id="statusFilter">
+        <option value="">All Statuses</option>
+        <option>Open</option><option>Investigating</option>
+        <option>Resolved</option><option>Closed</option>
+    </select>
+    <div class="view-toggle">
+        <button class="toggle-btn active" id="cardViewBtn"
+                onclick="setView('card')">
+            <i class="fas fa-th-large"></i>
+        </button>
+        <button class="toggle-btn" id="tableViewBtn"
+                onclick="setView('table')">
+            <i class="fas fa-list"></i>
+        </button>
+    </div>
+
+</div>
+
+<!-- CARD VIEW -->
+<div id="cardView">
+    {% if incidents %}
+        {% for incident in incidents %}
+        <div class="incident-card {{ incident.severity|lower }}"
+             onclick="window.location='{{ url_for('incidents.incident_detail', incident_id=incident.id) }}'">
+            <div class="d-flex align-items-start justify-content-between gap-3">
+                <div style="flex:1;">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span style="font-size:11px;color:var(--text-muted);">#{{ incident.id }}</span>
+                        <span class="severity-badge severity-{{ incident.severity|lower }}">
+                            {{ incident.severity }}
+                        </span>
+                        <span class="status-badge status-{{ incident.status|lower }}">
+                            {{ incident.status }}
+                        </span>
+                    </div>
+                    <div class="incident-title">{{ incident.title }}</div>
+                    <div class="incident-meta">
+                        <span><i class="fas fa-clock"></i>
+                            {{ incident.created_at.strftime('%Y-%m-%d %H:%M') if incident.created_at else 'N/A' }}
+                        </span>
+                        <span><i class="fas fa-user"></i>
+                            {{ incident.assigned_to or 'Unassigned' }}
+                        </span>
+                        <span><i class="fas fa-bell"></i>
+                            {{ incident.alert_count or 0 }} alerts
+                        </span>
+                    </div>
+                    {% if incident.description %}
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:8px;
+                                display:-webkit-box;-webkit-line-clamp:2;
+                                -webkit-box-orient:vertical;overflow:hidden;">
+                        {{ incident.description }}
+                    </div>
+                    {% endif %}
+                    <!-- Progress -->
+                    <div class="progress-mini">
+                        <div class="progress-mini-fill"
+                             style="width:{{ incident.progress or 0 }}%;
+                                    background:{{ '#00ff88' if incident.status=='resolved' else 'linear-gradient(90deg,#00d4ff,#0066ff)' }};">
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-size:11px;color:var(--text-muted);">Priority</div>
+                    <div style="font-size:22px;font-weight:700;
+                                color:{{ '#ff4757' if incident.severity=='Critical' else '#ff6b35' if incident.severity=='High' else '#ffd700' if incident.severity=='Medium' else '#00d4ff' }};">
+                        {{ incident.priority or 'P2' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="card">
+            <div class="card-body">
+                    <div class="empty-state">
+                    <i class="fas fa-fire-flame-curved"></i>
+                    <p>No incidents found</p>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- TABLE VIEW -->
+<div id="tableView" style="display:none;">
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-fire" style="color:#ff6b35;"></i>
+            <span class="card-title">Incidents</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Assignee</th>
+                        <th>Alerts</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if incidents %}
+                        {% for incident in incidents %}
+                        <tr>
+                            <td style="font-size:12px;color:var(--text-muted);">#{{ incident.id }}</td>
+                            <td>
+                                <div style="font-size:13px;font-weight:500;max-width:220px;">
+                                    {{ incident.title[:45] }}{% if incident.title|length > 45 %}...{% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="severity-badge severity-{{ incident.severity|lower }}">
+                                    {{ incident.severity }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ incident.status|lower }}">
+                                    {{ incident.status }}
+                                </span>
+                            </td>
+                            <td style="font-size:12px;color:var(--text-secondary);">
+                                {{ incident.assigned_to or 'Unassigned' }}
+                            </td>
+                            <td style="font-size:12px;text-align:center;">
+                                {{ incident.alert_count or 0 }}
+                            </td>
+                            <td style="font-size:11px;color:var(--text-muted);white-space:nowrap;">
+                                {{ incident.created_at.strftime('%Y-%m-%d %H:%M') if incident.created_at else 'N/A' }}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('incidents.incident_detail', incident_id=incident.id) }}"
+                                   style="padding:5px 10px;background:rgba(0,212,255,0.1);
+                                          border:1px solid rgba(0,212,255,0.2);color:#00d4ff;
+                                          border-radius:6px;font-size:11px;text-decoration:none;">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr><td colspan="8">
+                            <div class="empty-state">
+                                <i class="fas fa-fire-flame-curved"></i>
+                                <p>No incidents found</p>
+                            </div>
+                        </td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function setView(view) {
+    const cardView  = document.getElementById('cardView');
+    const tableView = document.getElementById('tableView');
+    const cardBtn   = document.getElementById('cardViewBtn');
+    const tableBtn  = document.getElementById('tableViewBtn');
+
+    if (view === 'card') {
+        cardView.style.display  = 'block';
+        tableView.style.display = 'none';
+        cardBtn.classList.add('active');
+        tableBtn.classList.remove('active');
+    } else {
+        cardView.style.display  = 'none';
+        tableView.style.display = 'block';
+        tableBtn.classList.add('active');
+        cardBtn.classList.remove('active');
+    }
+    localStorage.setItem('incidentView', view);
+}
+
+// Restore saved view
+const savedView = localStorage.getItem('incidentView');
+if (savedView) setView(savedView);
+
+// Filter
+function applyFilters() {
+    const search   = document.getElementById('searchInput').value.toLowerCase();
+    const severity = document.getElementById('severityFilter').value.toLowerCase();
+    const status   = document.getElementById('statusFilter').value.toLowerCase();
+
+    document.querySelectorAll('.incident-card').forEach(card => {
+        const text = card.textContent.toLowerCase();
+        const matchSearch   = !search   || text.includes(search);
+        const matchSeverity = !severity || card.classList.contains(severity);
+        const matchStatus   = !status   || text.includes(status);
+        card.style.display  = matchSearch && matchSeverity && matchStatus ? '' : 'none';
+    });
+}
+
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+document.getElementById('severityFilter').addEventListener('change', applyFilters);
+document.getElementById('statusFilter').addEventListener('change', applyFilters);
+</script>
+{% endblock %}

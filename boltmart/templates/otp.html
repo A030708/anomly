@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Verify OTP - BoltMart{% endblock %}
+
+{% block content %}
+<div class="bm-card" style="max-width: 400px; margin: 40px auto; padding: 30px; text-align: center;">
+    <h2 style="margin-top:0; color:var(--bm-primary);">Verify Login</h2>
+    <p style="color:var(--bm-muted); margin-bottom:20px;">
+        For your security, we've sent a 6-digit OTP to your email (simulated).
+    </p>
+
+    {% if error %}
+    <div class="bm-alert" style="background:#fff5f5; color:#e53e3e; border-left:4px solid #e53e3e; padding:12px; margin-bottom:20px;">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    {% if code %}
+    <div style="background:#f0f9ff; color:#0369a1; padding:10px; margin-bottom:20px; border-radius:4px; border:1px dashed #7dd3fc;">
+        <strong>[SIMULATION] Your OTP is: </strong><span style="font-size:20px; letter-spacing:2px; font-weight:bold;">{{ code }}</span>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('verify_otp_route') }}">
+        <input type="hidden" name="email" value="{{ email }}">
+        
+        <div class="bm-form-group">
+            <input type="text" name="code" class="bm-input" placeholder="Enter 6-digit code" required style="text-align:center; font-size:18px; letter-spacing:2px;" autocomplete="off">
+        </div>
+        
+        <button type="submit" class="bm-btn bm-btn-primary" style="width: 100%;">Verify</button>
+    </form>
+</div>
+{% endblock %}

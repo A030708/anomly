@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{% if user %}Edit {{ user.username }}{% else %}Add User{% endif %}{% endblock %}
+{% block header_title %}{% if user %}Edit User{% else %}Add User{% endif %}{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('admin_users') }}" style="color: var(--wos-accent); font-weight: 600; text-decoration: none; margin-bottom: 24px; display: inline-block;">
+  &larr; Back to Admin
+</a>
+
+<div style="max-width: 500px;">
+  <form method="POST" class="wos-card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Username</label>
+      <input type="text" name="username" value="{{ user.username if user else '' }}" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Email</label>
+      <input type="email" name="email" value="{{ user.email if user else '' }}" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Password {% if user %}<small style="font-weight: 400; color: var(--wos-text-muted);">(leave blank to keep current)</small>{% endif %}</label>
+      <input type="password" name="password" {% if not user %}required{% endif %} style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Role</label>
+      <select name="role" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+        <option value="staff" {% if user and user.role == 'staff' %}selected{% endif %}>Staff</option>
+        <option value="delivery" {% if user and user.role == 'delivery' %}selected{% endif %}>Delivery</option>
+        <option value="manager" {% if user and user.role == 'manager' %}selected{% endif %}>Manager</option>
+        <option value="admin" {% if user and user.role == 'admin' %}selected{% endif %}>Admin</option>
+      </select>
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Department</label>
+      <input type="text" name="department" value="{{ user.department if user else '' }}" placeholder="e.g. Fulfillment" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    {% if user %}
+    <div>
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; cursor: pointer;">
+        <input type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %} style="width: 16px; height: 16px;">
+        Account Active
+      </label>
+    </div>
+    {% endif %}
+    <button type="submit" class="wos-btn wos-btn-primary" style="width: 100%; padding: 12px; font-size: 15px; margin-top: 8px;">
+      <i class="fa-solid fa-floppy-disk"></i> {% if user %}Save Changes{% else %}Create User{% endif %}
+    </button>
+  </form>
+</div>
+
+{% endblock %}

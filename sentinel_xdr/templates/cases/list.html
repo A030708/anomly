@@ -1,0 +1,499 @@
+{% extends "base.html" %}
+
+{% block title %}Cases - {{ platform_name }}{% endblock %}
+{% block page_title %}Case Management{% endblock %}
+{% block breadcrumb %}Cases{% endblock %}
+
+{% block extra_css %}
+<style>
+    .case-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+    }
+    .case-card::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 4px;
+        border-radius: 12px 0 0 12px;
+    }
+    .case-card.critical::before { background: #ff4757; }
+    .case-card.high::before     { background: #ff6b35; }
+    .case-card.medium::before   { background: #ffd700; }
+    .case-card.low::before      { background: #00d4ff; }
+    .case-card:hover {
+        background: var(--bg-card-hover);
+        border-color: rgba(255,255,255,0.12);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+    .case-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 5px;
+    }
+    .case-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+    }
+    .case-meta span { display: flex; align-items: center; gap: 4px; }
+    .tag-chip {
+        padding: 2px 8px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 4px;
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-right: 4px;
+    }
+    .kanban-board {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        min-height: 500px;
+    }
+    .kanban-col {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 12px;
+        padding: 14px;
+        min-height: 400px;
+    }
+    .kanban-col-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .kanban-col-title {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .kanban-count {
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .kanban-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .kanban-card:hover {
+        border-color: rgba(0,212,255,0.25);
+        background: var(--bg-card-hover);
+    }
+    .kanban-card-title {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+        line-height: 1.4;
+    }
+    .filter-bar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 14px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+    .filter-input, .filter-select {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 13px;
+        outline: none;
+    }
+    .filter-input:focus { border-color: #00d4ff; }
+    .filter-input::placeholder { color: rgba(255,255,255,0.35); }
+    .filter-select option { background: #1a2035; }
+    .view-toggle {
+        display: flex;
+        gap: 3px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 8px;
+        padding: 3px;
+    }
+    .vtoggle-btn {
+        padding: 5px 11px;
+        border-radius: 5px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .vtoggle-btn.active {
+        background: rgba(0,212,255,0.15);
+        color: #00d4ff;
+    }
+    .sla-badge {
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+    .sla-ok       { background:rgba(0,255,136,0.12); color:#00ff88; }
+    .sla-warning  { background:rgba(255,215,0,0.12); color:#ffd700; }
+    .sla-breached { background:rgba(255,71,87,0.15); color:#ff4757; }
+    .avatar-stack {
+        display: flex;
+        margin-left: auto;
+    }
+    .avatar-mini {
+        width: 22px; height: 22px;
+        border-radius: 50%;
+        background: linear-gradient(135deg,#00d4ff,#a855f7);
+        border: 2px solid var(--bg-card);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 9px;
+        color: white;
+        font-weight: 700;
+        margin-left: -6px;
+        flex-shrink: 0;
+    }
+    .avatar-mini:first-child { margin-left: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Row -->
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Total Cases',    stats.total,       '#e2e8f0', 'fas fa-folder-open',   'rgba(0,212,255,0.08)'),
+        ('Open',           stats.open,        '#ff4757', 'fas fa-folder',        'rgba(255,71,87,0.12)'),
+        ('In Progress',    stats.in_progress, '#ffd700', 'fas fa-spinner',       'rgba(255,215,0,0.12)'),
+        ('Pending Review', stats.pending,     '#a855f7', 'fas fa-clock',         'rgba(168,85,247,0.12)'),
+        ('Closed',         stats.closed,      '#00ff88', 'fas fa-folder-closed', 'rgba(0,255,136,0.1)'),
+        ('SLA Breached',   stats.sla_breached,'#ff4757', 'fas fa-triangle-exclamation','rgba(255,71,87,0.12)'),
+    ] %}
+    {% for label, value, color, icon, bg in kpis %}
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:22px;">{{ value }}</div>
+                </div>
+                <div class="stat-icon" style="background:{{ bg }};">
+                    <i class="{{ icon }}" style="color:{{ color }};"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <i class="fas fa-filter" style="color:var(--text-muted);font-size:12px;"></i>
+    <input type="text" class="filter-input" id="caseSearch"
+           placeholder="Search cases..." style="flex:1;min-width:200px;">
+    <select class="filter-select" id="priorityFilter">
+        <option value="">All Priorities</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+    </select>
+    <select class="filter-select" id="statusFilter">
+        <option value="">All Statuses</option>
+        <option value="open">Open</option>
+        <option value="in-progress">In Progress</option>
+        <option value="pending">Pending Review</option>
+        <option value="closed">Closed</option>
+    </select>
+    <select class="filter-select" id="assigneeFilter">
+        <option value="">All Assignees</option>
+        {% for analyst in analysts %}
+        <option value="{{ analyst.username }}">{{ analyst.username }}</option>
+        {% endfor %}
+    </select>
+    <div class="view-toggle">
+        <button class="vtoggle-btn active" id="listViewBtn" onclick="setView('list')">
+            <i class="fas fa-list"></i>
+        </button>
+        <button class="vtoggle-btn" id="kanbanViewBtn" onclick="setView('kanban')">
+            <i class="fas fa-columns"></i>
+        </button>
+    </div>
+    <a href="{{ url_for('cases.create_case') }}" class="btn-primary-custom"
+       style="font-size:12px;padding:7px 14px;">
+        <i class="fas fa-plus"></i> New Case
+    </a>
+</div>
+
+<!-- ── LIST VIEW ── -->
+<div id="listView">
+    {% if cases %}
+        {% for case in cases %}
+        <div class="case-card {{ case.priority|lower }}"
+             onclick="window.location='{{ url_for('cases.case_detail', case_id=case.id) }}'">
+            <div class="d-flex align-items-start gap-3">
+                <div style="flex:1;min-width:0;">
+                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                        <span style="font-size:11px;color:var(--text-muted);">#{{ case.id }}</span>
+                        <span class="severity-badge severity-{{ case.priority|lower }}">{{ case.priority }}</span>
+                        <span class="status-badge status-{{ case.status|lower|replace(' ','-') }}">{{ case.status }}</span>
+                        {% if case.sla_status %}
+                        <span class="sla-badge sla-{{ case.sla_status|lower }}">SLA: {{ case.sla_status }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="case-title">{{ case.title }}</div>
+                    <div class="case-meta">
+                        <span><i class="fas fa-calendar"></i> {{ case.created_at.strftime('%Y-%m-%d %H:%M') if case.created_at else 'N/A' }}</span>
+                        <span><i class="fas fa-user"></i> {{ case.assigned_to or 'Unassigned' }}</span>
+                        <span><i class="fas fa-bell"></i> {{ case.alert_count or 0 }} alerts</span>
+                        <span><i class="fas fa-fire"></i> {{ case.incident_count or 0 }} incidents</span>
+                        <span><i class="fas fa-paperclip"></i> {{ case.evidence_count or 0 }} files</span>
+                        {% if case.due_date %}
+                        <span style="color:{{ '#ff4757' if case.is_overdue else '#ffd700' if case.due_soon else 'var(--text-muted)' }};">
+                            <i class="fas fa-clock"></i> Due: {{ case.due_date.strftime('%Y-%m-%d') }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% if case.tags %}
+                    <div>
+                        {% for tag in case.tags.split(',')[:5] %}
+                        <span class="tag-chip">{{ tag.strip() }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div style="flex-shrink:0;text-align:right;">
+                    {% if case.assignees %}
+                    <div class="avatar-stack mb-2">
+                        {% for a in case.assignees[:3] %}
+                        <div class="avatar-mini" title="{{ a }}">{{ a[0].upper() }}</div>
+                        {% endfor %}
+                        {% if case.assignees|length > 3 %}
+                        <div class="avatar-mini" style="background:rgba(255,255,255,0.1);">+{{ case.assignees|length - 3 }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    <div style="font-size:10px;color:var(--text-muted);">Last updated</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">{{ case.updated_at.strftime('%H:%M %d/%m') if case.updated_at else 'N/A' }}</div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        {% set demo_cases = [
+            (1, 'APT29 Intrusion Investigation',              'Critical', 'In Progress',  'analyst1', 5, 2, 8,  'On Track', '2024-01-10'),
+            (2, 'Ransomware Attack - Finance Department',     'Critical', 'Open',         'analyst2', 8, 3, 12, 'Warning',  '2024-01-12'),
+            (3, 'Insider Threat - Data Exfiltration',         'High',     'Pending Review','analyst1',3, 1, 5,  'On Track', '2024-01-13'),
+            (4, 'Phishing Campaign - Executive Targeting',    'High',     'In Progress',  'analyst3', 6, 0, 3,  'On Track', '2024-01-14'),
+            (5, 'Supply Chain Compromise Investigation',      'Medium',   'Open',         'Unassigned',2,0, 1,  'Breached', '2024-01-08'),
+            (6, 'DDoS Attack Origin Investigation',           'Medium',   'Closed',       'analyst2', 4, 1, 7,  'On Track', '2024-01-05'),
+            (7, 'Credential Stuffing - Customer Portal',      'High',     'In Progress',  'analyst4', 7, 0, 4,  'Warning',  '2024-01-15'),
+            (8, 'Malware Outbreak - Engineering Floor',       'Critical', 'Open',         'analyst1', 9, 2, 15, 'Breached', '2024-01-09'),
+        ] %}
+        {% for cid, title, priority, status, assignee, alerts, incidents, evidence, sla, created in demo_cases %}
+        <div class="case-card {{ priority|lower }}"
+             onclick="window.location='{{ url_for('cases.case_detail', case_id=cid) }}'">
+            <div class="d-flex align-items-start gap-3">
+                <div style="flex:1;min-width:0;">
+                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                        <span style="font-size:11px;color:var(--text-muted);">#{{ cid }}</span>
+                        <span class="severity-badge severity-{{ priority|lower }}">{{ priority }}</span>
+                        <span class="status-badge status-{{ status|lower|replace(' ','-') }}">{{ status }}</span>
+                        <span class="sla-badge sla-{{ sla|lower|replace(' ','-') }}">SLA: {{ sla }}</span>
+                    </div>
+                    <div class="case-title">{{ title }}</div>
+                    <div class="case-meta">
+                        <span><i class="fas fa-calendar"></i> {{ created }}</span>
+                        <span><i class="fas fa-user"></i> {{ assignee }}</span>
+                        <span><i class="fas fa-bell"></i> {{ alerts }} alerts</span>
+                        <span><i class="fas fa-fire"></i> {{ incidents }} incidents</span>
+                        <span><i class="fas fa-paperclip"></i> {{ evidence }} files</span>
+                    </div>
+                </div>
+                <div style="flex-shrink:0;text-align:right;">
+                    <div class="avatar-stack mb-2">
+                        <div class="avatar-mini">{{ assignee[0].upper() if assignee != 'Unassigned' else '?' }}</div>
+                    </div>
+                    <div style="font-size:10px;color:var(--text-muted);">Priority</div>
+                    <div style="font-size:16px;font-weight:700;color:{{ '#ff4757' if priority=='Critical' else '#ff6b35' if priority=='High' else '#ffd700' if priority=='Medium' else '#00d4ff' }};">P{{ loop.index }}</div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+</div>
+
+<!-- ── KANBAN VIEW ── -->
+<div id="kanbanView" style="display:none;">
+    <div class="kanban-board">
+        <div class="kanban-col">
+            <div class="kanban-col-header">
+                <span class="kanban-col-title" style="color:#ff4757;">Open</span>
+                <span class="kanban-count" style="background:rgba(255,71,87,0.15);color:#ff4757;">{{ stats.open }}</span>
+            </div>
+            {% for case in cases if case.status == 'Open' %}
+            <div class="kanban-card" onclick="window.location='{{ url_for('cases.case_detail', case_id=case.id) }}'">
+                <div class="kanban-card-title">{{ case.title[:60] }}...</div>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="severity-badge severity-{{ case.priority|lower }}" style="font-size:9px;padding:1px 6px;">{{ case.priority }}</span>
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:auto;">#{{ case.id }}</span>
+                </div>
+            </div>
+            {% else %}
+            {% for i in range(3) %}
+            <div class="kanban-card">
+                <div class="kanban-card-title">{{ ['APT29 Investigation','Ransomware Response','Credential Theft'][i] }}</div>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="severity-badge severity-{{ ['Critical','Critical','High'][i]|lower }}" style="font-size:9px;padding:1px 6px;">{{ ['Critical','Critical','High'][i] }}</span>
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:auto;">#{{ i+1 }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+        <div class="kanban-col">
+            <div class="kanban-col-header">
+                <span class="kanban-col-title" style="color:#ffd700;">In Progress</span>
+                <span class="kanban-count" style="background:rgba(255,215,0,0.15);color:#ffd700;">{{ stats.in_progress }}</span>
+            </div>
+            {% for case in cases if case.status == 'In Progress' %}
+            <div class="kanban-card" onclick="window.location='{{ url_for('cases.case_detail', case_id=case.id) }}'">
+                <div class="kanban-card-title">{{ case.title[:60] }}...</div>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="severity-badge severity-{{ case.priority|lower }}" style="font-size:9px;padding:1px 6px;">{{ case.priority }}</span>
+                    <span style="font-size:10px;color:var(--text-muted);">{{ case.assigned_to or 'Unassigned' }}</span>
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:auto;">#{{ case.id }}</span>
+                </div>
+            </div>
+            {% else %}
+            {% for i in range(2) %}
+            <div class="kanban-card">
+                <div class="kanban-card-title">{{ ['Insider Threat Case','Phishing Campaign'][i] }}</div>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="severity-badge severity-{{ ['High','High'][i]|lower }}" style="font-size:9px;padding:1px 6px;">{{ ['High','High'][i] }}</span>
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:auto;">#{{ i+4 }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+        <div class="kanban-col">
+            <div class="kanban-col-header">
+                <span class="kanban-col-title" style="color:#a855f7;">Pending Review</span>
+                <span class="kanban-count" style="background:rgba(168,85,247,0.15);color:#a855f7;">{{ stats.pending }}</span>
+            </div>
+            {% for case in cases if case.status == 'Pending Review' %}
+            <div class="kanban-card" onclick="window.location='{{ url_for('cases.case_detail', case_id=case.id) }}'">
+                <div class="kanban-card-title">{{ case.title[:60] }}...</div>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="severity-badge severity-{{ case.priority|lower }}" style="font-size:9px;padding:1px 6px;">{{ case.priority }}</span>
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:auto;">#{{ case.id }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="kanban-card">
+                <div class="kanban-card-title">Supply Chain Investigation</div>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="severity-badge severity-medium" style="font-size:9px;padding:1px 6px;">Medium</span>
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:auto;">#5</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="kanban-col">
+            <div class="kanban-col-header">
+                <span class="kanban-col-title" style="color:#00ff88;">Closed</span>
+                <span class="kanban-count" style="background:rgba(0,255,136,0.12);color:#00ff88;">{{ stats.closed }}</span>
+            </div>
+            {% for case in cases if case.status == 'Closed' %}
+            <div class="kanban-card" onclick="window.location='{{ url_for('cases.case_detail', case_id=case.id) }}'">
+                <div class="kanban-card-title">{{ case.title[:60] }}...</div>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="severity-badge severity-{{ case.priority|lower }}" style="font-size:9px;padding:1px 6px;">{{ case.priority }}</span>
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:auto;">#{{ case.id }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="kanban-card" style="opacity:0.6;">
+                <div class="kanban-card-title">DDoS Investigation</div>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="severity-badge severity-medium" style="font-size:9px;padding:1px 6px;">Medium</span>
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:auto;">#6</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function setView(view) {
+    const listView = document.getElementById('listView');
+    const kanbanView = document.getElementById('kanbanView');
+    const listBtn = document.getElementById('listViewBtn');
+    const kanbanBtn = document.getElementById('kanbanViewBtn');
+    if (view === 'list') {
+        listView.style.display = 'block';
+        kanbanView.style.display = 'none';
+        listBtn.classList.add('active');
+        kanbanBtn.classList.remove('active');
+    } else {
+        listView.style.display = 'none';
+        kanbanView.style.display = 'block';
+        kanbanBtn.classList.add('active');
+        listBtn.classList.remove('active');
+    }
+    localStorage.setItem('caseView', view);
+}
+
+const savedView = localStorage.getItem('caseView');
+if (savedView) setView(savedView);
+
+document.getElementById('caseSearch').addEventListener('input', filterCases);
+document.getElementById('priorityFilter').addEventListener('change', filterCases);
+document.getElementById('statusFilter').addEventListener('change', filterCases);
+
+function filterCases() {
+    const search = document.getElementById('caseSearch').value.toLowerCase();
+    const priority = document.getElementById('priorityFilter').value.toLowerCase();
+    const status = document.getElementById('statusFilter').value.toLowerCase();
+    document.querySelectorAll('.case-card').forEach(card => {
+        const text = card.textContent.toLowerCase();
+        card.style.display = (!search || text.includes(search)) && (!priority || card.classList.contains(priority)) && (!status || text.includes(status)) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

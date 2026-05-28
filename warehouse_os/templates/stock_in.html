@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Stock Receiving{% endblock %}
+{% block header_title %}Stock Receiving{% endblock %}
+{% block content %}
+
+<h1 class="wos-page-title" style="margin-bottom: 8px;">Stock Receiving</h1>
+<p style="color: var(--wos-text-muted); margin-bottom: 24px;">Add incoming stock to the warehouse inventory.</p>
+
+{% if selected_po %}
+<div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--wos-radius-md); padding: 16px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+  <div>
+    <strong style="color: #1e40af;">Receiving Against PO: {{ selected_po.po_number }}</strong>
+    <span style="color: #64748b; font-size: 13px; margin-left: 12px;">Total: ₹{{ "%.0f"|format(selected_po.total_value or 0) }}</span>
+  </div>
+  <a href="{{ url_for('stock_in') }}" style="color: #3b82f6; font-size: 13px; text-decoration: none;"><i class="fa-solid fa-xmark"></i> Clear PO</a>
+</div>
+{% endif %}
+
+<div style="max-width: 800px;">
+  <form method="POST" class="wos-card" style="padding: 24px; margin-bottom: 32px; display: flex; flex-direction: column; gap: 16px;">
+    {% if selected_po %}
+    <input type="hidden" name="po_id" value="{{ selected_po.id }}">
+    {% endif %}
+
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Product (SKU)</label>
+      {% if po_items %}
+      <select name="sku" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+        {% for item in po_items %}
+        {% set p = products|selectattr("sku", "equalto", item.sku)|first %}
+        <option value="{{ item.sku }}" data-stock="{{ p.stock_count if p else 0 }}" data-reorder="{{ p.reorder_level if p else 0 }}" {% if loop.first %}selected{% endif %}>
+          {{ item.sku }} — {{ p.name if p else item.sku }} (Ordered: {{ item.ordered_qty }}, Received: {{ item.received_qty }})
+        </option>
+        {% endfor %}
+        <option value="" disabled>──────────</option>
+        <option value="other">Other product (not in PO)</option>
+      </select>
+      {% else %}
+      <select name="sku" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+        {% for product in products %}
+        <option value="{{ product.sku }}" data-stock="{{ product.stock_count }}" data-reorder="{{ product.reorder_level }}">
+          {{ product.sku }} — {{ product.name }} (Current: {{ product.stock_count }})
+        </option>
+        {% endfor %}
+      </select>
+      {% endif %}
+    </div>
+
+    {% if po_items %}
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">PO Item</label>
+      <select name="po_item_id" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+        {% for item in po_items %}
+        <option value="{{ item.id }}">{{ item.sku }} — Ordered {{ item.ordered_qty }}, Received {{ item.received_qty }}</option>
+        {% endfor %}
+        <option value="">Not in PO</option>
+      </select>
+    </div>
+    {% endif %}
+
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Quantity Received</label>
+      <input type="number" name="quantity" min="1" required placeholder="e.g. 100" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <div>
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Reason / Source</label>
+      <select name="reason" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+        <option value="Restock">Restock</option>
+        <option value="PO Receipt">PO Receipt</option>
+        <option value="New Shipment">New Shipment</option>
+        <option value="Return">Return</option>
+        <option value="Correction">Correction</option>
+      </select>
+    </div>
+    <div id="preview" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: var(--wos-radius-md); color: #166534; font-size: 14px; display: none;">
+      After receipt: <strong id="new_stock" style="font-weight: 700;">0</strong> units
+    </div>
+    <button type="submit" class="wos-btn" style="width: 100%; padding: 12px; font-size: 15px; background: var(--wos-success); color: white; margin-top: 8px;">
+      <i class="fa-solid fa-arrow-down"></i> Receive Stock
+    </button>
+  </form>
+
+  <div class="wos-card">
+    <div style="padding: 16px 24px; border-bottom: 1px solid var(--wos-border); font-weight: 700; font-size: 16px;">
+      Recent Stock Receiving
+    </div>
+    <div class="wos-table-wrapper" style="border: none; border-radius: 0 0 var(--wos-radius-lg) var(--wos-radius-lg); box-shadow: none;">
+      <table class="wos-table">
+        <thead>
+          <tr><th>Time</th><th>SKU</th><th>Qty</th><th>Reason</th><th>By</th></tr>
+        </thead>
+        <tbody>
+          {% for m in recent_stockins %}
+          <tr>
+            <td style="color: var(--wos-text-muted);">{{ m.timestamp[:16].replace('T',' ') }}</td>
+            <td style="font-family: monospace; font-weight: 500;">{{ m.sku }}</td>
+            <td style="font-weight: 700; color: var(--wos-success);">+{{ m.quantity }}</td>
+            <td><span class="wos-badge wos-badge-neutral">{{ m.reason or 'N/A' }}</span></td>
+            <td style="color: var(--wos-text-muted);">{{ m.performed_by or 'Unknown' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" style="text-align: center; padding: 32px; color: var(--wos-text-muted);">No stock receipts yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const skuSelect = document.querySelector('select[name="sku"]');
+  const quantityInput = document.querySelector('input[name="quantity"]');
+  const preview = document.getElementById('preview');
+  const newStock = document.getElementById('new_stock');
+
+  function updatePreview() {
+    const opt = skuSelect.options[skuSelect.selectedIndex];
+    const current = parseInt(opt.dataset.stock || 0);
+    const qty = parseInt(quantityInput.value || 0);
+    if (qty > 0) {
+      preview.style.display = 'block';
+      newStock.textContent = current + qty;
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+
+  skuSelect.addEventListener('change', updatePreview);
+  quantityInput.addEventListener('input', updatePreview);
+</script>
+
+{% endblock %}

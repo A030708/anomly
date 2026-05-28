@@ -1,0 +1,4 @@
+{
+  "invoice_threshold": 25000,
+  "writeoff_threshold": 10000
+}

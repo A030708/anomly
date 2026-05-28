@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}WarehouseOS Admin Panel{% endblock %}
+{% block header_title %}Admin Panel{% endblock %}
+{% block content %}
+
+<h1 class="wos-page-title" style="margin-bottom: 8px;">Admin Panel</h1>
+<p style="color: var(--wos-text-muted); margin-bottom: 24px;">User management and system configuration.</p>
+
+<!-- Tabs -->
+<div style="display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 1px solid var(--wos-border); padding-bottom: 8px;">
+    <a href="{{ url_for('admin_users') }}" id="tab_users" style="padding: 8px 16px; border-radius: 4px 4px 0 0; font-weight: 700; text-decoration: none; font-size: 14px; {% if active_tab == 'users' %}background: var(--wos-primary); color: white;{% else %}background: transparent; color: var(--wos-text-muted);{% endif %} border: none; cursor: pointer; transition: background 0.2s;">Users</a>
+    <a href="{{ url_for('blocked_ips') }}" id="tab_blocked_ips" style="padding: 8px 16px; border-radius: 4px 4px 0 0; font-weight: 700; text-decoration: none; font-size: 14px; {% if active_tab == 'blocked_ips' %}background: var(--wos-primary); color: white;{% else %}background: transparent; color: var(--wos-text-muted);{% endif %} border: none; cursor: pointer; transition: background 0.2s;">Blocked IPs</a>
+    <a href="{{ url_for('admin_config') }}" id="tab_config" style="padding: 8px 16px; border-radius: 4px 4px 0 0; font-weight: 700; text-decoration: none; font-size: 14px; {% if active_tab == 'config' %}background: var(--wos-primary); color: white;{% else %}background: transparent; color: var(--wos-text-muted);{% endif %} border: none; cursor: pointer; transition: background 0.2s;">Config</a>
+</div>
+
+<!-- Users Tab -->
+{% if active_tab == 'users' %}
+<div id="tab_content_users">
+    <div class="wos-card wos-table-wrapper" style="margin-bottom: 32px;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--wos-border); display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 700;">All Users</span>
+            <a href="{{ url_for('user_new') }}" class="wos-btn wos-btn-primary" style="padding: 6px 14px; font-size: 13px;">
+                <i class="fa-solid fa-plus"></i> Add User
+            </a>
+        </div>
+        <table class="wos-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Department</th>
+                    <th>Active</th>
+                    <th>Last Login</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td style="font-weight: 700;">{{ user['username'] }}</td>
+                    <td style="color: var(--wos-secondary);">{{ user['email'] }}</td>
+                    <td>
+                        <span class="wos-badge
+                            {% if user['role'] == 'admin' %}wos-badge-danger
+                            {% elif user['role'] == 'manager' %}wos-badge-info
+                            {% elif user['role'] == 'staff' %}wos-badge-success
+                            {% else %}wos-badge-warning{% endif %}">
+                            {{ user['role'] | upper }}
+                        </span>
+                    </td>
+                    <td style="color: var(--wos-text-muted);">{{ user.get('department') or '-' }}</td>
+                    <td>{{ '✅' if user['is_active'] else '❌' }}</td>
+                    <td style="color: #94a3b8; font-size: 12px;">{{ (user.get('last_login') or 'Never')[:10] }}</td>
+                    <td>
+                        <div style="display: flex; gap: 6px;">
+                            <a href="{{ url_for('user_edit', user_id=user.id) }}" class="wos-btn wos-btn-secondary" style="padding: 4px 10px; font-size: 12px;">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            {% if current_user.id != user.id %}
+                            <form method="POST" action="{{ url_for('user_delete', user_id=user.id) }}" onsubmit="return confirm('Delete user {{ user.username }}? This cannot be undone.')" style="display: inline;">
+                                <button type="submit" class="wos-btn wos-btn-danger" style="padding: 4px 10px; font-size: 12px;">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Blocked IPs Tab -->
+{% if active_tab == 'blocked_ips' %}
+<div id="tab_content_blocked_ips">
+    <div class="wos-card wos-table-wrapper" style="margin-bottom: 32px;">
+        <div style="padding: 16px; border-bottom: 1px solid var(--wos-border); font-weight: 700;">Blocked IP Addresses</div>
+        <table class="wos-table">
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>Reason</th>
+                    <th>Severity</th>
+                    <th>Blocked Until</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ip in blocked_ips_list %}
+                <tr>
+                    <td style="font-family: monospace; font-weight: 700;">{{ ip['ip_address'] }}</td>
+                    <td style="color: var(--wos-text-muted);">{{ ip.get('reason') or 'No reason provided' }}</td>
+                    <td>
+                        <span class="wos-badge
+                            {% if ip['severity'] == 'CRITICAL' %}wos-badge-danger
+                            {% elif ip['severity'] == 'HIGH' %}wos-badge-warning
+                            {% else %}wos-badge-neutral{% endif %}">
+                            {{ ip.get('severity') or 'INFO' }}
+                        </span>
+                    </td>
+                    <td style="color: #64748b; font-size: 13px;">
+                        {{ ip['blocked_until'][:16].replace('T', ' ') if ip.get('blocked_until') else 'Permanent' }}
+                    </td>
+                    <td>
+                        {% if ip['is_active'] %}
+                        <span class="wos-badge wos-badge-danger">Active</span>
+                        {% else %}
+                        <span class="wos-badge wos-badge-neutral">Expired</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--wos-text-muted);">
+                        <i class="fa-solid fa-shield-halved" style="font-size: 32px; margin-bottom: 12px; color: #cbd5e1;"></i>
+                        <p>No blocked IP addresses currently.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Config Tab -->
+{% if active_tab == 'config' %}
+<div id="tab_content_config">
+    <form method="POST" class="wos-card" style="padding: 24px; max-width: 600px;">
+        <h3 style="font-weight: 700; font-size: 18px; margin-bottom: 16px;">System Configuration</h3>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="border-bottom: 1px solid var(--wos-border); padding-bottom: 16px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px;">Invoice Auto-Approval Threshold (₹)</label>
+                <p style="font-size: 14px; color: var(--wos-text-muted); margin-bottom: 8px;">Invoices below this amount are auto-approved.</p>
+                <input type="number" name="invoice_threshold" value="{{ cfg.invoice_threshold }}" min="0" step="1000" style="width: 200px; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+            </div>
+            <div style="border-bottom: 1px solid var(--wos-border); padding-bottom: 16px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px;">Write-Off Approval Threshold (₹)</label>
+                <p style="font-size: 14px; color: var(--wos-text-muted); margin-bottom: 8px;">Write-offs above this need manager approval.</p>
+                <input type="number" name="writeoff_threshold" value="{{ cfg.writeoff_threshold }}" min="0" step="1000" style="width: 200px; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <p style="font-weight: 700;">Sentinel XDR Connection</p>
+                    <p style="font-size: 14px; color: var(--wos-text-muted);">Telemetry pipeline status.</p>
+                </div>
+                <span class="wos-badge wos-badge-success" style="border-radius: 9999px;">CONNECTED</span>
+            </div>
+        </div>
+        <button type="submit" class="wos-btn wos-btn-primary" style="margin-top: 20px; padding: 10px 24px;">
+            <i class="fa-solid fa-floppy-disk"></i> Save Configuration
+        </button>
+    </form>
+</div>
+{% endif %}
+
+{% endblock %}

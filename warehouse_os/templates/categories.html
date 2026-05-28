@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Category Manager{% endblock %}
+{% block header_title %}Category Manager{% endblock %}
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <h1 class="wos-page-title" style="margin-bottom: 0;">Category Manager</h1>
+</div>
+
+<div style="max-width: 600px;">
+  <form method="POST" class="wos-card" style="padding: 24px; margin-bottom: 32px; display: flex; gap: 12px; align-items: flex-end;">
+    <div style="flex-grow: 1;">
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">New Category</label>
+      <input type="text" name="name" required placeholder="e.g. Chemicals" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 14px; outline: none;">
+    </div>
+    <button type="submit" class="wos-btn wos-btn-primary" style="padding: 8px 20px; height: 38px;">
+      <i class="fa-solid fa-plus"></i> Add
+    </button>
+  </form>
+
+  <div class="wos-card wos-table-wrapper">
+    <div style="padding: 16px 20px; border-bottom: 1px solid var(--wos-border); font-weight: 700;">All Categories</div>
+    <table class="wos-table">
+      <thead><tr><th>Name</th><th></th></tr></thead>
+      <tbody>
+        {% for cat in categories %}
+        <tr>
+          <td style="font-weight: 600;">{{ cat }}</td>
+          <td style="text-align: right;">
+            <form method="POST" action="{{ url_for('category_delete', name=cat) }}" onsubmit="return confirm('Remove category \"{{ cat }}\"? Products using this category will keep it as text.')" style="display: inline;">
+              <button type="submit" class="wos-btn wos-btn-danger" style="padding: 4px 10px; font-size: 12px;">
+                <i class="fa-solid fa-trash"></i> Remove
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" style="text-align: center; padding: 32px; color: var(--wos-text-muted);">No categories yet. Add one above.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,951 @@
+{% extends "base.html" %}
+
+{% block title %}Threat Intelligence - {{ platform_name }}{% endblock %}
+{% block page_title %}Threat Intelligence{% endblock %}
+{% block breadcrumb %}Threat Intel{% endblock %}
+
+{% block extra_css %}
+<style>
+    .intel-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px;
+        transition: all 0.2s;
+        height: 100%;
+    }
+    .intel-card:hover {
+        border-color: rgba(0,212,255,0.25);
+        background: var(--bg-card-hover);
+        transform: translateY(-1px);
+    }
+    .ioc-type-badge {
+        padding: 3px 9px;
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .ioc-ip      { background:rgba(0,212,255,0.12);  color:#00d4ff; }
+    .ioc-domain  { background:rgba(168,85,247,0.12); color:#a855f7; }
+    .ioc-hash    { background:rgba(255,215,0,0.12);  color:#ffd700; }
+    .ioc-url     { background:rgba(0,255,136,0.12);  color:#00ff88; }
+    .ioc-email   { background:rgba(255,107,53,0.12); color:#ff6b35; }
+    .ioc-cve     { background:rgba(255,71,87,0.12);  color:#ff4757; }
+    .threat-actor-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 10px;
+        transition: all 0.2s;
+    }
+    .threat-actor-card:hover {
+        border-color: rgba(255,71,87,0.3);
+        background: var(--bg-card-hover);
+    }
+    .confidence-ring {
+        width: 44px; height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .feed-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-status-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .filter-bar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 14px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+    .filter-input, .filter-select {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 13px;
+        outline: none;
+    }
+    .filter-input:focus { border-color: #00d4ff; }
+    .filter-input::placeholder { color: rgba(255,255,255,0.35); }
+    .filter-select option { background: #1a2035; }
+    .tabs-nav {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .tab-pill {
+        padding: 9px 20px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-size: 13px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+    }
+    .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+    .tab-pill:hover  { color: var(--text-primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .hash-val {
+        font-family: monospace;
+        font-size: 11px;
+        color: #ffd700;
+        word-break: break-all;
+    }
+    .tlp-badge {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+    }
+    .tlp-red    { background:rgba(255,71,87,0.15);  color:#ff4757; }
+    .tlp-amber  { background:rgba(255,215,0,0.15);  color:#ffd700; }
+    .tlp-green  { background:rgba(0,255,136,0.12);  color:#00ff88; }
+    .tlp-white  { background:rgba(255,255,255,0.08);color:#e2e8f0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Stats -->
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Total IOCs',      stats.total_iocs,    '#e2e8f0', 'fas fa-crosshairs',    'rgba(0,212,255,0.1)'),
+        ('Malicious IPs',   stats.malicious_ips, '#ff4757', 'fas fa-network-wired', 'rgba(255,71,87,0.1)'),
+        ('Malicious URLs',  stats.malicious_urls,'#ff6b35', 'fas fa-link',          'rgba(255,107,53,0.1)'),
+        ('Malware Hashes',  stats.hashes,        '#ffd700', 'fas fa-hashtag',       'rgba(255,215,0,0.1)'),
+        ('Threat Actors',   stats.actors,        '#a855f7', 'fas fa-user-secret',   'rgba(168,85,247,0.1)'),
+        ('Active Feeds',    stats.feeds,         '#00ff88', 'fas fa-rss',           'rgba(0,255,136,0.1)'),
+    ] %}
+    {% for label, value, color, icon, bg in kpis %}
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:22px;">{{ value }}</div>
+                </div>
+                <div class="stat-icon" style="background:{{ bg }};">
+                    <i class="{{ icon }}" style="color:{{ color }};"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Tabs -->
+<div class="tabs-nav">
+    <button class="tab-pill active" onclick="switchTab('iocs', this)">
+        <i class="fas fa-crosshairs"></i> IOCs
+        <span style="background:rgba(255,71,87,0.2);color:#ff4757;
+                     padding:1px 7px;border-radius:10px;font-size:10px;">
+            {{ stats.total_iocs }}
+        </span>
+    </button>
+    <button class="tab-pill" onclick="switchTab('actors', this)">
+        <i class="fas fa-user-secret"></i> Threat Actors
+    </button>
+    <button class="tab-pill" onclick="switchTab('feeds', this)">
+        <i class="fas fa-rss"></i> Intel Feeds
+    </button>
+    <button class="tab-pill" onclick="switchTab('lookup', this)">
+        <i class="fas fa-magnifying-glass"></i> IOC Lookup
+    </button>
+    <button class="tab-pill" onclick="switchTab('campaigns', this)">
+        <i class="fas fa-flag"></i> Campaigns
+    </button>
+</div>
+
+<!-- ── TAB: IOCs ── -->
+<div class="tab-content active" id="tab-iocs">
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <i class="fas fa-filter" style="color:var(--text-muted);font-size:12px;"></i>
+        <input type="text" class="filter-input" id="iocSearch"
+               placeholder="Search IOCs..." style="flex:1;min-width:180px;">
+        <select class="filter-select" id="iocTypeFilter">
+            <option value="">All Types</option>
+            <option value="ip">IP Address</option>
+            <option value="domain">Domain</option>
+            <option value="hash">File Hash</option>
+            <option value="url">URL</option>
+            <option value="email">Email</option>
+            <option value="cve">CVE</option>
+        </select>
+        <select class="filter-select" id="iocThreatFilter">
+            <option value="">All Threats</option>
+            <option value="malware">Malware</option>
+            <option value="ransomware">Ransomware</option>
+            <option value="phishing">Phishing</option>
+            <option value="c2">C2 Server</option>
+            <option value="botnet">Botnet</option>
+        </select>
+        <select class="filter-select" id="iocTlpFilter">
+            <option value="">All TLP</option>
+            <option value="red">RED</option>
+            <option value="amber">AMBER</option>
+            <option value="green">GREEN</option>
+            <option value="white">WHITE</option>
+        </select>
+        <div class="ms-auto d-flex gap-2">
+            <button class="btn-primary-custom"
+                    style="font-size:12px;padding:7px 14px;"
+                    onclick="importIOCs()">
+                <i class="fas fa-file-import"></i> Import
+            </button>
+            <a href="{{ url_for('threat_intel.add_ioc') }}"
+               class="btn-primary-custom" style="font-size:12px;padding:7px 14px;">
+                <i class="fas fa-plus"></i> Add IOC
+            </a>
+        </div>
+    </div>
+
+    <!-- IOC Table -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-crosshairs" style="color:#ff4757;"></i>
+            <span class="card-title">Indicators of Compromise</span>
+            <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">
+                {{ iocs|length }} indicators
+            </span>
+            <div class="ms-auto d-flex gap-2">
+                <button onclick="exportIOCs()"
+                        style="padding:5px 12px;background:rgba(255,255,255,0.05);
+                               border:1px solid rgba(255,255,255,0.1);color:var(--text-muted);
+                               border-radius:6px;font-size:11px;cursor:pointer;">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table" id="iocTable">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="selectAllIOC"></th>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Threat Category</th>
+                        <th>Confidence</th>
+                        <th>TLP</th>
+                        <th>Source</th>
+                        <th>First Seen</th>
+                        <th>Last Seen</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="iocBody">
+                    {% if iocs %}
+                        {% for ioc in iocs %}
+                        <tr data-type="{{ ioc.ioc_type|lower }}"
+                            data-tlp="{{ ioc.tlp|lower if ioc.tlp else '' }}">
+                            <td><input type="checkbox" class="ioc-check"></td>
+                            <td>
+                                <span class="ioc-type-badge ioc-{{ ioc.ioc_type|lower }}">
+                                    {{ ioc.ioc_type }}
+                                </span>
+                            </td>
+                            <td style="max-width:200px;">
+                                {% if ioc.ioc_type in ['hash', 'md5', 'sha256'] %}
+                                    <span class="hash-val">{{ ioc.value[:32] }}...</span>
+                                {% else %}
+                                    <span style="font-family:monospace;font-size:12px;
+                                                 color:#00d4ff;">{{ ioc.value }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span style="font-size:12px;color:var(--text-secondary);">
+                                    {{ ioc.threat_category or 'Unknown' }}
+                                </span>
+                            </td>
+                            <td>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <div style="width:55px;height:5px;
+                                                background:rgba(255,255,255,0.08);
+                                                border-radius:3px;overflow:hidden;">
+                                        <div style="width:{{ ioc.confidence or 0 }}%;
+                                                    height:100%;border-radius:3px;
+                                                    background:{{ '#00ff88' if (ioc.confidence or 0)>75
+                                                               else '#ffd700' if (ioc.confidence or 0)>50
+                                                               else '#ff6b35' }};"></div>
+                                    </div>
+                                    <span style="font-size:11px;color:var(--text-muted);">
+                                        {{ ioc.confidence or 0 }}%
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="tlp-badge tlp-{{ ioc.tlp|lower if ioc.tlp else 'white' }}">
+                                    TLP:{{ ioc.tlp or 'WHITE' }}
+                                </span>
+                            </td>
+                            <td style="font-size:11px;color:var(--text-muted);">
+                                {{ ioc.source or 'Manual' }}
+                            </td>
+                            <td style="font-size:11px;color:var(--text-muted);white-space:nowrap;">
+                                {{ ioc.first_seen.strftime('%Y-%m-%d') if ioc.first_seen else 'N/A' }}
+                            </td>
+                            <td style="font-size:11px;color:var(--text-muted);white-space:nowrap;">
+                                {{ ioc.last_seen.strftime('%Y-%m-%d') if ioc.last_seen else 'N/A' }}
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <button onclick="lookupIOC('{{ ioc.value }}')"
+                                            style="padding:3px 8px;background:rgba(0,212,255,0.1);
+                                                   border:1px solid rgba(0,212,255,0.2);color:#00d4ff;
+                                                   border-radius:5px;font-size:10px;cursor:pointer;">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                    <button onclick="blockIOC('{{ ioc.id }}')"
+                                            style="padding:3px 8px;background:rgba(255,71,87,0.1);
+                                                   border:1px solid rgba(255,71,87,0.2);color:#ff4757;
+                                                   border-radius:5px;font-size:10px;cursor:pointer;">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="10">
+                                <div class="empty-state">
+                                    <i class="fas fa-crosshairs"></i>
+                                    <p>No IOCs found. Import or add indicators.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB: Threat Actors ── -->
+<div class="tab-content" id="tab-actors">
+    <div class="row g-4">
+        <!-- Actor List -->
+        <div class="col-lg-7">
+            {% if threat_actors %}
+                {% for actor in threat_actors %}
+                <div class="threat-actor-card">
+                    <div class="d-flex align-items-start gap-3">
+                        <div style="width:46px;height:46px;border-radius:12px;
+                                    background:rgba(255,71,87,0.12);
+                                    display:flex;align-items:center;justify-content:center;
+                                    flex-shrink:0;">
+                            <i class="fas fa-user-secret"
+                               style="color:#ff4757;font-size:18px;"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <div style="font-size:14px;font-weight:600;
+                                            color:var(--text-primary);">
+                                    {{ actor.name }}
+                                </div>
+                                <span style="padding:2px 8px;background:rgba(255,71,87,0.1);
+                                             color:#ff4757;border-radius:4px;font-size:10px;">
+                                    {{ actor.threat_level or 'HIGH' }}
+                                </span>
+                                {% if actor.nation_state %}
+                                <span style="padding:2px 8px;background:rgba(255,215,0,0.1);
+                                             color:#ffd700;border-radius:4px;font-size:10px;">
+                                    Nation-State
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+                                {{ actor.description[:120] if actor.description else 'No description' }}...
+                            </div>
+                            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                                {% if actor.origin_country %}
+                                <span style="font-size:11px;color:var(--text-muted);">
+                                    <i class="fas fa-globe me-1"></i>{{ actor.origin_country }}
+                                </span>
+                                {% endif %}
+                                {% if actor.first_seen %}
+                                <span style="font-size:11px;color:var(--text-muted);">
+                                    <i class="fas fa-calendar me-1"></i>
+                                    Active since {{ actor.first_seen.strftime('%Y') }}
+                                </span>
+                                {% endif %}
+                                {% if actor.target_sectors %}
+                                <span style="font-size:11px;color:var(--text-muted);">
+                                    <i class="fas fa-bullseye me-1"></i>
+                                    {{ actor.target_sectors }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <!-- TTPs -->
+                            <div class="mt-2">
+                                {% if actor.ttps %}
+                                    {% for ttp in actor.ttps.split(',')[:5] %}
+                                    <span style="padding:2px 8px;background:rgba(168,85,247,0.1);
+                                                 color:#a855f7;border-radius:4px;
+                                                 font-size:10px;margin:2px;display:inline-block;">
+                                        {{ ttp.strip() }}
+                                    </span>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div style="text-align:right;flex-shrink:0;">
+                            <div class="confidence-ring"
+                                 style="background:rgba(0,212,255,0.1);
+                                        border:2px solid rgba(0,212,255,0.3);
+                                        color:#00d4ff;">
+                                {{ actor.confidence or 0 }}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="card">
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <i class="fas fa-user-secret"></i>
+                            <p>No threat actors tracked</p>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Actor Stats -->
+        <div class="col-lg-5">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-chart-pie" style="color:#a855f7;"></i>
+                    <span class="card-title">Actor Distribution</span>
+                </div>
+                <div class="card-body">
+                    <canvas id="actorChart" height="180"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-globe" style="color:#00d4ff;"></i>
+                    <span class="card-title">Target Sectors</span>
+                </div>
+                <div class="card-body">
+                    {% set sectors = [
+                        ('Finance', 34, '#ff4757'),
+                        ('Healthcare', 28, '#ff6b35'),
+                        ('Government', 22, '#ffd700'),
+                        ('Energy', 18, '#00d4ff'),
+                        ('Technology', 15, '#a855f7'),
+                        ('Retail', 10, '#00ff88'),
+                    ] %}
+                    {% for sector, pct, color in sectors %}
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div style="width:90px;font-size:11px;
+                                    color:var(--text-secondary);">{{ sector }}</div>
+                        <div style="flex:1;height:6px;background:rgba(255,255,255,0.06);
+                                    border-radius:3px;overflow:hidden;">
+                            <div style="width:{{ pct }}%;height:100%;
+                                        background:{{ color }};border-radius:3px;"></div>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-muted);
+                                    width:30px;text-align:right;">{{ pct }}%</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB: Intel Feeds ── -->
+<div class="tab-content" id="tab-feeds">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-rss" style="color:#00ff88;"></i>
+                    <span class="card-title">Threat Intelligence Feeds</span>
+                    <a href="{{ url_for('threat_intel.add_feed') }}"
+                       class="btn-primary-custom ms-auto"
+                       style="font-size:12px;padding:6px 12px;">
+                        <i class="fas fa-plus"></i> Add Feed
+                    </a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Feed Name</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>IOC Count</th>
+                                <th>Last Updated</th>
+                                <th>Frequency</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if feeds %}
+                                {% for feed in feeds %}
+                                <tr>
+                                    <td>
+                                        <div style="font-size:13px;font-weight:500;">
+                                            {{ feed.name }}
+                                        </div>
+                                        <div style="font-size:10px;color:var(--text-muted);">
+                                            {{ feed.url[:40] if feed.url else '' }}...
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span style="padding:2px 8px;border-radius:4px;
+                                                     font-size:10px;background:rgba(0,212,255,0.1);
+                                                     color:#00d4ff;">
+                                            {{ feed.feed_type }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div style="width:7px;height:7px;border-radius:50%;
+                                                        background:{{ '#00ff88' if feed.is_active else '#ff4757' }};"></div>
+                                            <span style="font-size:12px;
+                                                         color:{{ '#00ff88' if feed.is_active else '#ff4757' }};">
+                                                {{ 'Active' if feed.is_active else 'Inactive' }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td style="font-size:13px;font-weight:600;
+                                               color:#00d4ff;text-align:center;">
+                                        {{ feed.ioc_count or 0 }}
+                                    </td>
+                                    <td style="font-size:11px;color:var(--text-muted);">
+                                        {{ feed.last_updated.strftime('%Y-%m-%d %H:%M') if feed.last_updated else 'Never' }}
+                                    </td>
+                                    <td style="font-size:11px;color:var(--text-secondary);">
+                                        {{ feed.update_frequency or 'Daily' }}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-1">
+                                            <button onclick="syncFeed('{{ feed.id }}')"
+                                                    style="padding:4px 9px;background:rgba(0,212,255,0.1);
+                                                           border:1px solid rgba(0,212,255,0.2);
+                                                           color:#00d4ff;border-radius:5px;
+                                                           font-size:10px;cursor:pointer;">
+                                                <i class="fas fa-sync"></i>
+                                            </button>
+                                            <button onclick="toggleFeed('{{ feed.id }}')"
+                                                    style="padding:4px 9px;
+                                                           background:rgba(255,215,0,0.1);
+                                                           border:1px solid rgba(255,215,0,0.2);
+                                                           color:#ffd700;border-radius:5px;
+                                                           font-size:10px;cursor:pointer;">
+                                                <i class="fas fa-power-off"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="empty-state">
+                                            <i class="fas fa-rss"></i>
+                                            <p>No feeds configured</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feed Stats -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-chart-line" style="color:#00d4ff;"></i>
+                    <span class="card-title">Feed Activity</span>
+                </div>
+                <div class="card-body">
+                    <canvas id="feedActivityChart" height="160"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-info-circle" style="color:#ffd700;"></i>
+                    <span class="card-title">Feed Summary</span>
+                </div>
+                <div class="card-body">
+                    {% set feed_stats = [
+                        ('Active Feeds',  stats.feeds,         '#00ff88'),
+                        ('Total IOCs',    stats.total_iocs,    '#00d4ff'),
+                        ('Updated Today', stats.updated_today, '#ffd700'),
+                        ('Failed Syncs',  stats.failed_syncs,  '#ff4757'),
+                    ] %}
+                    {% for label, value, color in feed_stats %}
+                    <div class="d-flex justify-content-between py-2"
+                         style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                        <span style="font-size:12px;color:var(--text-muted);">{{ label }}</span>
+                        <span style="font-size:13px;font-weight:600;color:{{ color }};">
+                            {{ value }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB: IOC Lookup ── -->
+<div class="tab-content" id="tab-lookup">
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-magnifying-glass" style="color:#00d4ff;"></i>
+                    <span class="card-title">IOC Lookup & Enrichment</span>
+                </div>
+                <div class="card-body">
+                    <div style="display:flex;gap:10px;margin-bottom:20px;">
+                        <input type="text" id="lookupInput"
+                               class="filter-input" style="flex:1;font-size:14px;padding:12px;"
+                               placeholder="Enter IP, domain, hash, URL or email...">
+                        <button onclick="performLookup()"
+                                class="btn-primary-custom" style="padding:12px 20px;">
+                            <i class="fas fa-search"></i> Lookup
+                        </button>
+                    </div>
+
+                    <!-- Lookup Results -->
+                    <div id="lookupResults" style="display:none;">
+                        <div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);
+                                    border-radius:10px;padding:16px;" id="lookupContent">
+                        </div>
+                    </div>
+
+                    <!-- Quick Examples -->
+                    <div style="margin-top:16px;">
+                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
+                            Quick lookup examples:
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                            {% set examples = ['8.8.8.8', 'malware.com', 'd41d8cd98f00b204e9800998ecf8427e', 'http://evil.ru/payload'] %}
+                            {% for ex in examples %}
+                            <button onclick="document.getElementById('lookupInput').value='{{ ex }}'"
+                                    style="padding:4px 10px;background:rgba(255,255,255,0.05);
+                                           border:1px solid rgba(255,255,255,0.1);
+                                           color:var(--text-muted);border-radius:6px;
+                                           font-size:11px;font-family:monospace;cursor:pointer;">
+                                {{ ex }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enrichment Sources -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-database" style="color:#a855f7;"></i>
+                    <span class="card-title">Enrichment Sources</span>
+                </div>
+                <div class="card-body">
+                    {% set sources = [
+                        ('VirusTotal',      True,  '#00ff88', 'fas fa-shield-check'),
+                        ('AbuseIPDB',       True,  '#00ff88', 'fas fa-ban'),
+                        ('Shodan',          True,  '#00ff88', 'fas fa-network-wired'),
+                        ('OTX AlienVault',  True,  '#00ff88', 'fas fa-alien'),
+                        ('Cisco Talos',     False, '#ff4757', 'fas fa-building'),
+                        ('IBM X-Force',     True,  '#00ff88', 'fas fa-bolt'),
+                        ('MISP',            True,  '#00ff88', 'fas fa-share-nodes'),
+                        ('ThreatConnect',   False, '#ffd700', 'fas fa-link'),
+                    ] %}
+                    {% for name, active, color, icon in sources %}
+                    <div class="feed-item">
+                        <div style="width:32px;height:32px;border-radius:8px;
+                                    background:rgba(255,255,255,0.05);
+                                    display:flex;align-items:center;justify-content:center;
+                                    flex-shrink:0;">
+                            <i class="{{ icon }}"
+                               style="color:{{ color }};font-size:13px;"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="font-size:13px;font-weight:500;">{{ name }}</div>
+                        </div>
+                        <div class="feed-status-dot"
+                             style="background:{{ color }};"></div>
+                        <span style="font-size:11px;color:{{ color }};">
+                            {{ 'Active' if active else ('Limited' if color == '#ffd700' else 'Inactive') }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── TAB: Campaigns ── -->
+<div class="tab-content" id="tab-campaigns">
+    <div class="row g-4">
+        {% if campaigns %}
+            {% for campaign in campaigns %}
+            <div class="col-lg-6">
+                <div class="intel-card">
+                    <div class="d-flex align-items-start justify-content-between mb-3">
+                        <div>
+                            <div style="font-size:15px;font-weight:600;
+                                        color:var(--text-primary);margin-bottom:4px;">
+                                {{ campaign.name }}
+                            </div>
+                            <div style="font-size:11px;color:var(--text-muted);">
+                                {{ campaign.actor or 'Unknown Actor' }} ·
+                                {{ campaign.first_seen.strftime('%Y') if campaign.first_seen else 'Unknown' }}
+                            </div>
+                        </div>
+                        <span class="severity-badge severity-{{ campaign.severity|lower }}">
+                            {{ campaign.severity }}
+                        </span>
+                    </div>
+                    <p style="font-size:12px;color:var(--text-muted);line-height:1.6;
+                               margin-bottom:12px;">
+                        {{ campaign.description[:150] if campaign.description else 'No description' }}...
+                    </p>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;">
+                        {% if campaign.tags %}
+                            {% for tag in campaign.tags.split(',')[:4] %}
+                            <span style="padding:2px 8px;background:rgba(255,255,255,0.06);
+                                         border-radius:4px;font-size:10px;color:var(--text-muted);">
+                                {{ tag.strip() }}
+                            </span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    <div class="d-flex gap-3 mt-3"
+                         style="font-size:11px;color:var(--text-muted);">
+                        <span><i class="fas fa-crosshairs me-1"></i>{{ campaign.ioc_count or 0 }} IOCs</span>
+                        <span><i class="fas fa-server me-1"></i>{{ campaign.target_count or 0 }} targets</span>
+                        <span><i class="fas fa-calendar me-1"></i>
+                            {{ campaign.last_seen.strftime('%Y-%m-%d') if campaign.last_seen else 'N/A' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <i class="fas fa-flag"></i>
+                            <p>No campaigns tracked</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Tab switching
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+
+// IOC filter
+document.getElementById('iocSearch').addEventListener('input', filterIOCs);
+document.getElementById('iocTypeFilter').addEventListener('change', filterIOCs);
+document.getElementById('iocTlpFilter').addEventListener('change', filterIOCs);
+
+function filterIOCs() {
+    const search = document.getElementById('iocSearch').value.toLowerCase();
+    const type   = document.getElementById('iocTypeFilter').value.toLowerCase();
+    const tlp    = document.getElementById('iocTlpFilter').value.toLowerCase();
+
+    document.querySelectorAll('#iocBody tr[data-type]').forEach(row => {
+        const text     = row.textContent.toLowerCase();
+        const rowType  = row.dataset.type;
+        const rowTlp   = row.dataset.tlp;
+
+        const ok = (!search || text.includes(search)) &&
+                   (!type   || rowType === type) &&
+                   (!tlp    || rowTlp  === tlp);
+        row.style.display = ok ? '' : 'none';
+    });
+}
+
+// Select all IOCs
+document.getElementById('selectAllIOC').addEventListener('change', function() {
+    document.querySelectorAll('.ioc-check').forEach(cb => cb.checked = this.checked);
+});
+
+// IOC Lookup
+function performLookup() {
+    const val = document.getElementById('lookupInput').value.trim();
+    if (!val) return;
+
+    const resultsDiv = document.getElementById('lookupResults');
+    const contentDiv = document.getElementById('lookupContent');
+    resultsDiv.style.display = 'block';
+
+    contentDiv.innerHTML = `
+        <div style="text-align:center;padding:20px;color:var(--text-muted);">
+            <i class="fas fa-spinner fa-spin" style="font-size:24px;margin-bottom:10px;color:#00d4ff;"></i>
+            <div style="font-size:13px;">Looking up: <strong style="color:#00d4ff;">${val}</strong></div>
+        </div>`;
+
+    // Simulate API call
+    setTimeout(() => {
+        contentDiv.innerHTML = `
+            <div style="margin-bottom:12px;">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">LOOKUP RESULT</div>
+                <div style="font-size:14px;font-weight:600;color:#00d4ff;font-family:monospace;">${val}</div>
+            </div>
+            <div class="row g-2">
+                <div class="col-6">
+                    <div style="background:rgba(255,71,87,0.1);border:1px solid rgba(255,71,87,0.2);border-radius:8px;padding:10px;text-align:center;">
+                        <div style="font-size:10px;color:var(--text-muted);">VirusTotal</div>
+                        <div style="font-size:18px;font-weight:700;color:#ff4757;">3/72</div>
+                        <div style="font-size:10px;color:#ff4757;">MALICIOUS</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div style="background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px;text-align:center;">
+                        <div style="font-size:10px;color:var(--text-muted);">AbuseIPDB</div>
+                        <div style="font-size:18px;font-weight:700;color:#ffd700;">45%</div>
+                        <div style="font-size:10px;color:#ffd700;">SUSPICIOUS</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.15);border-radius:8px;padding:10px;text-align:center;">
+                        <div style="font-size:10px;color:var(--text-muted);">Shodan</div>
+                        <div style="font-size:18px;font-weight:700;color:#00ff88;">Clean</div>
+                        <div style="font-size:10px;color:#00ff88;">NO THREATS</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2);border-radius:8px;padding:10px;text-align:center;">
+                        <div style="font-size:10px;color:var(--text-muted);">OTX</div>
+                        <div style="font-size:18px;font-weight:700;color:#a855f7;">2</div>
+                        <div style="font-size:10px;color:#a855f7;">PULSES</div>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top:12px;text-align:center;">
+                <button onclick="addToIOCs('${val}')"
+                        style="padding:7px 16px;background:rgba(255,71,87,0.15);border:1px solid rgba(255,71,87,0.3);color:#ff4757;border-radius:7px;font-size:12px;cursor:pointer;">
+                    <i class="fas fa-plus me-1"></i> Add as Malicious IOC
+                </button>
+            </div>`;
+    }, 1500);
+}
+
+function lookupIOC(value) {
+    document.querySelectorAll('.tab-pill')[3].click();
+    document.getElementById('lookupInput').value = value;
+    performLookup();
+}
+
+function blockIOC(id)    { if(confirm('Block this IOC across all systems?')) alert('IOC blocked! ID: ' + id); }
+function addToIOCs(val)  { alert('Adding "' + val + '" to IOC database'); }
+function importIOCs()    { alert('Import IOCs from STIX/TAXII, CSV, or MISP'); }
+function exportIOCs()    { alert('Export IOCs to CSV/STIX format'); }
+function syncFeed(id)    { alert('Syncing feed ID: ' + id); }
+function toggleFeed(id)  { alert('Toggling feed ID: ' + id); }
+
+// Actor Chart
+new Chart(document.getElementById('actorChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Nation-State', 'Cybercriminal', 'Hacktivist', 'Insider', 'Unknown'],
+        datasets: [{
+            data: [35, 30, 15, 10, 10],
+            backgroundColor: ['#ff4757','#ff6b35','#ffd700','#a855f7','#64748b'],
+            borderWidth: 0,
+            hoverOffset: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: '#64748b',
+                    font: { size: 10 },
+                    padding: 10,
+                    boxWidth: 10
+                }
+            }
+        }
+    }
+});
+
+// Feed Activity Chart
+new Chart(document.getElementById('feedActivityChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+        datasets: [{
+            label: 'New IOCs',
+            data: [120, 95, 180, 140, 220, 80, 60],
+            backgroundColor: 'rgba(0,212,255,0.6)',
+            borderRadius: 4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 } } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 } }, beginAtZero: true }
+        }
+    }
+});
+</script>
+{% endblock %}

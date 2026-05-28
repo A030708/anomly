@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}WarehouseOS Audit Log{% endblock %}
+{% block header_title %}Audit Log{% endblock %}
+{% block content %}
+
+<h1 class="wos-page-title" style="margin-bottom: 8px;">Audit Log</h1>
+<p style="color: var(--wos-text-muted); margin-bottom: 24px;">Every action taken in WarehouseOS, immutably recorded.</p>
+
+<div class="wos-grid-stats">
+    <div class="wos-card" style="padding: 16px;">
+        <p style="font-size: 11px; color: var(--wos-text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">Entries Today</p>
+        <p style="font-size: 24px; font-weight: 700; color: var(--wos-accent);">{{ stats.total_today }}</p>
+    </div>
+    <div class="wos-card" style="padding: 16px;">
+        <p style="font-size: 11px; color: var(--wos-text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">Total Entries</p>
+        <p style="font-size: 24px; font-weight: 700; color: var(--wos-secondary);">{{ stats.total_all }}</p>
+    </div>
+    <div class="wos-card" style="padding: 16px;">
+        <p style="font-size: 11px; color: var(--wos-text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">Unique Actions</p>
+        <p style="font-size: 24px; font-weight: 700; color: var(--wos-success);">{{ stats.unique_actions }}</p>
+    </div>
+    <div class="wos-card" style="padding: 16px;">
+        <p style="font-size: 11px; color: var(--wos-text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">Active Users</p>
+        <p style="font-size: 24px; font-weight: 700; color: #7e22ce;">{{ stats.unique_users }}</p>
+    </div>
+</div>
+
+<form method="GET" class="wos-card" style="padding: 16px; margin-bottom: 24px;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end;">
+        <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--wos-text-muted); margin-bottom: 4px;">Action</label>
+            <select name="action" style="width: 100%; padding: 8px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 13px; outline: none; background: white;">
+                <option value="">All Actions</option>
+                {% for a in available_actions %}
+                <option value="{{ a }}" {% if action_filter == a %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--wos-text-muted); margin-bottom: 4px;">Module</label>
+            <select name="module" style="width: 100%; padding: 8px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 13px; outline: none; background: white;">
+                <option value="">All Modules</option>
+                {% for m in available_modules %}
+                <option value="{{ m }}" {% if module_filter == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--wos-text-muted); margin-bottom: 4px;">User</label>
+            <select name="user" style="width: 100%; padding: 8px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 13px; outline: none; background: white;">
+                <option value="">All Users</option>
+                {% for u in available_users %}
+                <option value="{{ u }}" {% if user_filter == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="grid-column: span 2;">
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--wos-text-muted); margin-bottom: 4px;">Search</label>
+            <input type="text" name="search" placeholder="Search details or record ID..." value="{{ search }}" style="width: 100%; padding: 8px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); font-family: inherit; font-size: 13px; outline: none;">
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button type="submit" class="wos-btn wos-btn-primary" style="padding: 8px 16px; height: 35px;">Filter</button>
+            <a href="{{ url_for('audit_page') }}" class="wos-btn wos-btn-secondary" style="padding: 8px 16px; height: 35px;">Clear</a>
+        </div>
+    </div>
+</form>
+
+<div class="wos-card wos-table-wrapper">
+    <table class="wos-table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Module</th>
+                <th>Record</th>
+                <th>IP</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td style="color: var(--wos-text-muted); font-size: 12px; white-space: nowrap;">{{ log['timestamp'][:19].replace('T',' ') }}</td>
+                <td>
+                    <span style="font-weight: 600;">{{ log.get('username') or '-' }}</span>
+                    <span style="font-size: 11px; color: #94a3b8; margin-left: 4px;">({{ log.get('role') or '?' }})</span>
+                </td>
+                <td>
+                    <span class="wos-badge 
+                        {% if 'REVOKE' in (log['action'] or '') %}wos-badge-danger
+                        {% elif 'BLOCK' in (log['action'] or '') %}wos-badge-warning
+                        {% elif 'LOGIN' in (log['action'] or '') %}wos-badge-info
+                        {% elif 'EXPORT' in (log['action'] or '') %}style='background:#f3e8ff;color:#7e22ce;'
+                        {% elif 'WRITEOFF' in (log['action'] or '') %}wos-badge-warning
+                        {% elif 'CREATE' in (log['action'] or '') %}wos-badge-success
+                        {% elif 'DELETE' in (log['action'] or '') %}wos-badge-danger
+                        {% else %}wos-badge-neutral{% endif %}">
+                        {{ log['action'] }}
+                    </span>
+                </td>
+                <td style="color: var(--wos-text-muted); font-size: 13px;">{{ log.get('module') or '-' }}</td>
+                <td style="font-family: monospace; font-size: 12px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ log.get('affected_record') or '-' }}</td>
+                <td style="color: #94a3b8; font-size: 12px;">{{ log.get('ip_address') or '-' }}</td>
+                <td style="text-align: right;">
+                    <button onclick="toggleDetails('details-{{ loop.index }}')" style="background: none; border: none; color: var(--wos-accent); font-size: 12px; cursor: pointer; text-decoration: underline; font-family: inherit;">
+                        {% if log.get('details') and log['details'] != {} %}Details{% else %}-{% endif %}
+                    </button>
+                </td>
+            </tr>
+            <tr id="details-{{ loop.index }}" style="display: none; background: var(--wos-surface-hover);">
+                <td colspan="7" style="padding: 12px 16px;">
+                    <pre style="font-size: 11px; font-family: monospace; color: var(--wos-secondary); white-space: pre-wrap; margin: 0;">{{ log.get('details') | tojson(indent=2) if log.get('details') else 'No details' }}</pre>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 32px; color: var(--wos-text-muted);">
+                    <i class="fa-solid fa-list-check" style="font-size: 32px; margin-bottom: 12px; color: #cbd5e1;"></i>
+                    <p>No audit entries match your filters.</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; font-size: 14px;">
+    <p style="color: var(--wos-text-muted);">Page {{ page }} of {{ total_pages }} ({{ total }} entries)</p>
+    <div style="display: flex; gap: 8px;">
+        {% if page > 1 %}
+        <a href="?page={{ page - 1 }}&action={{ action_filter }}&module={{ module_filter }}&user={{ user_filter }}&search={{ search }}" class="wos-btn wos-btn-secondary" style="padding: 6px 12px; font-size: 13px;">&larr; Previous</a>
+        {% endif %}
+        
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+            <span class="wos-btn" style="background: var(--wos-primary); color: white; padding: 6px 12px; font-size: 13px; border: 1px solid var(--wos-primary);">{{ p }}</span>
+            {% elif p <= 3 or p >= total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+            <a href="?page={{ p }}&action={{ action_filter }}&module={{ module_filter }}&user={{ user_filter }}&search={{ search }}" class="wos-btn wos-btn-secondary" style="padding: 6px 12px; font-size: 13px;">{{ p }}</a>
+            {% elif p == 4 or p == total_pages - 3 %}
+            <span style="padding: 6px 4px; color: #94a3b8;">...</span>
+            {% endif %}
+        {% endfor %}
+        
+        {% if page < total_pages %}
+        <a href="?page={{ page + 1 }}&action={{ action_filter }}&module={{ module_filter }}&user={{ user_filter }}&search={{ search }}" class="wos-btn wos-btn-secondary" style="padding: 6px 12px; font-size: 13px;">Next &rarr;</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<script>
+function toggleDetails(id) {
+    var el = document.getElementById(id);
+    if (el) {
+        el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+    }
+}
+</script>
+
+{% endblock %}

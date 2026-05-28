@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Login - BoltMart{% endblock %}
+
+{% block content %}
+<div class="bm-card" style="max-width: 400px; margin: 40px auto; padding: 30px;">
+    <h2 style="margin-top:0; color:var(--bm-primary);">Login to BoltMart</h2>
+    
+    {% if error %}
+    <div class="bm-alert" style="background:#fff5f5; color:#e53e3e; border-left:4px solid #e53e3e; padding:12px; margin-bottom:20px;">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+        <div class="bm-form-group">
+            <label class="bm-label">Email Address</label>
+            <input type="email" name="email" class="bm-input" required>
+        </div>
+        
+        <div class="bm-form-group">
+            <label class="bm-label">Password</label>
+            <input type="password" name="password" class="bm-input" required>
+        </div>
+        
+        <button type="submit" class="bm-btn bm-btn-primary" style="width: 100%;">Login</button>
+    </form>
+    
+    <div style="margin-top: 20px; text-align: center;">
+        <a href="{{ url_for('register') }}" style="color:var(--bm-accent); text-decoration:none;">Don't have an account? Register here</a>
+    </div>
+</div>
+{% endblock %}

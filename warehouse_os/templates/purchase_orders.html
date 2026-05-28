@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Purchase Orders{% endblock %}
+{% block header_title %}Purchase Orders{% endblock %}
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 class="wos-page-title" style="margin-bottom: 4px;">Purchase Orders</h1>
+    <p style="color: var(--wos-text-muted); font-size: 14px;">Manage orders placed with suppliers.</p>
+  </div>
+  <div style="display: flex; gap: 8px;">
+    <a href="{{ url_for('po_discrepancies') }}" class="wos-btn wos-btn-secondary">
+      <i class="fa-solid fa-triangle-exclamation"></i> Discrepancies
+    </a>
+    <a href="{{ url_for('purchase_order_new') }}" class="wos-btn wos-btn-primary">
+      <i class="fa-solid fa-plus"></i> New PO
+    </a>
+  </div>
+</div>
+
+<div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+  <a href="{{ url_for('purchase_orders_list') }}" class="wos-btn wos-btn-{% if not current_status %}primary{% else %}secondary{% endif %}" style="padding: 6px 14px; font-size: 13px;">All</a>
+  <a href="{{ url_for('purchase_orders_list', status='sent') }}" class="wos-btn wos-btn-{% if current_status == 'sent' %}primary{% else %}secondary{% endif %}" style="padding: 6px 14px; font-size: 13px;">Sent</a>
+  <a href="{{ url_for('purchase_orders_list', status='received') }}" class="wos-btn wos-btn-{% if current_status == 'received' %}primary{% else %}secondary{% endif %}" style="padding: 6px 14px; font-size: 13px;">Received</a>
+  <a href="{{ url_for('purchase_orders_list', status='cancelled') }}" class="wos-btn wos-btn-{% if current_status == 'cancelled' %}primary{% else %}secondary{% endif %}" style="padding: 6px 14px; font-size: 13px;">Cancelled</a>
+</div>
+
+<div class="wos-table-wrapper">
+  <table class="wos-table">
+    <thead>
+      <tr>
+        <th>PO #</th>
+        <th>Supplier</th>
+        <th>Items</th>
+        <th>Total Value</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for po in pos %}
+      <tr>
+        <td style="font-family: monospace; font-weight: 600; font-size: 13px;">{{ po.po_number }}</td>
+        <td>{{ po.supplier_name }}</td>
+        <td>{{ po.items_count or '-' }}</td>
+        <td style="font-weight: 600;">₹{{ "%.0f"|format(po.total_value or 0) }}</td>
+        <td>
+          <span class="wos-badge {% if po.status == 'sent' %}wos-badge-info{% elif po.status == 'received' %}wos-badge-success{% elif po.status == 'cancelled' %}wos-badge-danger{% else %}wos-badge-neutral{% endif %}">
+            {{ po.status }}
+          </span>
+        </td>
+        <td style="font-size: 13px; color: var(--wos-text-muted);">{{ po.created_at[:10] }}</td>
+        <td>
+          <a href="{{ url_for('purchase_order_detail', po_id=po.id) }}" class="wos-btn wos-btn-secondary" style="padding: 4px 10px; font-size: 12px;">View</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--wos-text-muted);">No purchase orders yet. <a href="{{ url_for('purchase_order_new') }}" style="color: var(--wos-accent);">Create one</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} - BoltMart{% endblock %}
+{% block content %}
+
+<nav style="font-size: 14px; color: var(--bm-text-muted); margin-bottom: 24px;">
+    <a href="{{ url_for('home') }}" class="bm-nav-link">Home</a> &rsaquo;
+    <a href="{{ url_for('shop') }}" class="bm-nav-link">Shop</a> &rsaquo;
+    <span style="color: var(--bm-text-main); font-weight: 500;">{{ product.name }}</span>
+</nav>
+
+<div class="bm-detail-layout">
+    <div class="bm-image-placeholder" style="aspect-ratio: 1; height: 100%;">
+        &#128295;
+    </div>
+    <div style="background: var(--bm-surface); padding: 40px; border-radius: var(--bm-radius-lg); box-shadow: var(--bm-shadow-sm);">
+        <span style="font-size: 12px; font-weight: 700; color: var(--bm-primary); text-transform: uppercase; letter-spacing: 0.5px;">{{ product.category }}</span>
+        <h1 class="bm-page-title" style="margin-top: 8px; margin-bottom: 16px;">{{ product.name }}</h1>
+        <p style="color: var(--bm-text-muted); font-size: 16px; margin-bottom: 24px; line-height: 1.8;">{{ product.description or "High-quality industrial hardware." }}</p>
+        <div style="font-size: 40px; font-weight: 800; color: #166534; margin-bottom: 24px;">&#8377;{{ "%.0f"|format(product.price) }}</div>
+        
+        <div style="margin-bottom: 32px; border-top: 1px solid var(--bm-border); padding-top: 20px;">
+            <p style="margin-bottom: 8px; font-size: 15px;"><strong style="color: var(--bm-text-main);">SKU:</strong> {{ product.sku }}</p>
+            <p style="margin-bottom: 8px; font-size: 15px;"><strong style="color: var(--bm-text-main);">Availability:</strong>
+                <span class="bm-badge {% if product.stock_count > product.reorder_level %}bm-badge-stock{% else %}bm-badge-out{% endif %}">
+                    {{ product.stock_count }} in stock
+                </span>
+            </p>
+            <p style="font-size: 15px;"><strong style="color: var(--bm-text-main);">Category:</strong> {{ product.category }}</p>
+        </div>
+        
+        <form method="POST" action="{{ url_for('add_to_cart') }}">
+            <input type="hidden" name="sku" value="{{ product.sku }}">
+            <div class="bm-form-group">
+                <label class="bm-label">Quantity:</label>
+                <input type="number" name="quantity" value="1" min="1" max="{{ product.stock_count }}"
+                       class="bm-input" style="width: 100px; font-weight: 700; text-align: center;">
+            </div>
+            <button type="submit"
+                    class="bm-btn bm-btn-accent" style="width: 100%; padding: 16px; font-size: 18px;"
+                    {% if product.stock_count <= 0 %}disabled style="background: #94a3b8; cursor: not-allowed; box-shadow: none;"{% endif %}>
+                Add to Cart — &#8377;{{ "%.0f"|format(product.price) }}
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

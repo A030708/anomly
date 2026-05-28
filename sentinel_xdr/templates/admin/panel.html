@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - {{ platform_name }}{% endblock %}
+{% block page_title %}Administration{% endblock %}
+{% block breadcrumb %}Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; height: 100%; transition: all 0.2s; }
+    .admin-card:hover { background: var(--bg-card-hover); border-color: rgba(255,255,255,0.12); }
+    .service-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; }
+    .service-row:hover { background: rgba(255,255,255,0.02); }
+    .service-row:last-child { border-bottom: none; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .tabs-nav { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.07); flex-wrap: wrap; }
+    .tab-pill { padding: 9px 18px; background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
+    .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+    .tab-pill:hover { color: var(--text-primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .log-row { padding: 6px 12px; font-size: 11px; font-family: 'JetBrains Mono', monospace; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .log-row:hover { background: rgba(255,255,255,0.02); }
+    .log-row:last-child { border-bottom: none; }
+    .metric-ring { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; flex-shrink: 0; }
+    .quick-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; font-size: 12px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+    .quick-btn:hover { border-color: rgba(255,255,255,0.1); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Uptime', stats.uptime or '14d 7h 32m', '#00ff88', 'fas fa-clock', 'rgba(0,255,136,0.1)'),
+        ('Active Users', stats.active_users or 12, '#00d4ff', 'fas fa-users', 'rgba(0,212,255,0.1)'),
+        ('Active Sessions', stats.sessions or 8, '#a855f7', 'fas fa-plug', 'rgba(168,85,247,0.12)'),
+        ('Queued Jobs', stats.queued or 3, '#ffd700', 'fas fa-tasks', 'rgba(255,215,0,0.12)'),
+        ('Errors (24h)', stats.errors_24h or 2, '#ff4757', 'fas fa-bug', 'rgba(255,71,87,0.12)'),
+        ('Avg Response', stats.avg_response or '142ms', '#00ff88', 'fas fa-gauge-high', 'rgba(0,255,136,0.1)'),
+    ] %}
+    {% for label, value, color, icon, bg in kpis %}
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="admin-card" style="padding:14px;">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:36px;height:36px;border-radius:8px;background:{{ bg }};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="{{ icon }}" style="color:{{ color }};font-size:16px;"></i></div>
+                <div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;">{{ label }}</div><div style="font-size:18px;font-weight:700;color:{{ color }};">{{ value }}</div></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="tabs-nav">
+    <button class="tab-pill active" onclick="switchTab('dashboard', this)"><i class="fas fa-gauge"></i> Dashboard</button>
+    <button class="tab-pill" onclick="switchTab('services', this)"><i class="fas fa-server"></i> Services</button>
+    <button class="tab-pill" onclick="switchTab('workers', this)"><i class="fas fa-microchip"></i> Workers</button>
+    <button class="tab-pill" onclick="switchTab('logs', this)"><i class="fas fa-file-lines"></i> System Logs</button>
+</div>
+
+<div class="tab-content active" id="tab-dashboard">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card"><div class="card-header"><i class="fas fa-chart-area" style="color:#00d4ff;"></i><span class="card-title">System Resource Usage (24h)</span></div><div class="card-body"><canvas id="resourceChart" height="240"></canvas></div></div>
+        </div>
+        <div class="col-lg-4">
+            <div class="admin-card mb-3">
+                <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:12px;">Storage Utilization</div>
+                {% set storage = [('Database', '245 GB / 500 GB', 49, '#00d4ff'),('Artifacts', '128 GB / 200 GB', 64, '#a855f7'),('Logs', '67 GB / 100 GB', 67, '#ffd700'),('Backups', '312 GB / 1 TB', 31, '#00ff88')] %}
+                {% for name, used, pct, color in storage %}
+                <div class="mb-3"><div class="d-flex justify-content-between" style="font-size:11px;margin-bottom:4px;"><span style="color:var(--text-muted);">{{ name }}</span><span style="color:var(--text-secondary);">{{ used }}</span></div><div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;"><div style="height:100%;width:{{ pct }}%;background:{% if pct > 80 %}#ff4757{% elif pct > 60 %}#ffd700{% else %}{{ color }}{% endif %};border-radius:3px;"></div></div></div>
+                {% endfor %}
+            </div>
+            <div class="admin-card">
+                <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:12px;">Quick Actions</div>
+                {% set actions = [('Clear Cache', 'fas fa-eraser', '#ffd700'),('Restart Workers', 'fas fa-rotate', '#00d4ff'),('Run Health Check', 'fas fa-heart-pulse', '#00ff88'),('Vacuum Database', 'fas fa-database', '#a855f7'),('Generate Report', 'fas fa-file-export', '#ff4757')] %}
+                {% for name, icon, color in actions %}
+                <button onclick="adminAction('{{ name }}')" class="quick-btn" style="background:rgba(255,255,255,0.03);color:var(--text-secondary);"><i class="{{ icon }}" style="color:{{ color }};width:16px;"></i>{{ name }}</button>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="tab-content" id="tab-services">
+    <div class="card"><div class="card-header"><i class="fas fa-server" style="color:#00ff88;"></i><span class="card-title">Service Status</span><button style="padding:4px 10px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;border-radius:6px;font-size:10px;cursor:pointer;" onclick="adminAction('Restart All Services')"><i class="fas fa-rotate"></i> Restart All</button></div>
+    <div style="max-height:560px;overflow-y:auto;">
+        {% set services = [
+            ('sentinel-api', 'API Gateway', 'Running', '14d 7h 32m', '0.23', '45%', 'OK'),
+            ('sentinel-worker', 'Job Worker Pool', 'Running', '14d 7h 32m', '0.89', '72%', 'OK'),
+            ('sentinel-ml', 'ML Engine', 'Running', '7d 2h 15m', '0.45', '55%', 'OK'),
+            ('sentinel-mq', 'Message Queue', 'Running', '14d 7h 32m', '0.12', '22%', 'OK'),
+            ('sentinel-collector', 'Log Collector', 'Running', '14d 7h 32m', '0.34', '38%', 'OK'),
+            ('sentinel-active-resp', 'Active Response', 'Running', '14d 7h 32m', '0.08', '12%', 'OK'),
+            ('sentinel-db', 'PostgreSQL Database', 'Running', '14d 7h 32m', '1.20', '60%', 'Warning'),
+            ('sentinel-cache', 'Redis Cache', 'Degraded', '12d 3h 20m', '2.10', '85%', 'Alert'),
+            ('sentinel-scheduler', 'Job Scheduler', 'Running', '14d 7h 32m', '0.05', '8%', 'OK'),
+            ('sentinel-webhook', 'Webhook Handler', 'Running', '7d 0h 0m', '0.02', '4%', 'OK'),
+        ] %}
+        {% for sid, name, status, uptime, load, mem, health in services %}
+        <div class="service-row">
+            <span style="font-family:monospace;font-size:10px;color:var(--text-muted);min-width:130px;">{{ sid }}</span>
+            <span style="min-width:130px;font-size:12px;color:var(--text-primary);">{{ name }}</span>
+            <span class="status-dot" style="background:{% if status == 'Running' %}#00ff88{% elif status == 'Degraded' %}#ffd700{% else %}#ff4757{% endif %};"></span>
+            <span style="font-size:11px;color:{% if status == 'Running' %}#00ff88{% elif status == 'Degraded' %}#ffd700{% else %}#ff4757{% endif %};min-width:70px;">{{ status }}</span>
+            <span style="font-size:11px;color:var(--text-muted);min-width:100px;">{{ uptime }}</span>
+            <span style="font-size:10px;color:var(--text-secondary);min-width:40px;">{{ load }}</span>
+            <div style="flex:1;max-width:80px;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;"><div style="height:100%;width:{{ mem }};background:{% if mem|replace('%','')|int > 80 %}#ff4757{% elif mem|replace('%','')|int > 60 %}#ffd700{% else %}#00d4ff{% endif %};border-radius:3px;"></div></div>
+            <span style="font-size:10px;color:var(--text-muted);min-width:36px;">{{ mem }}</span>
+            <span style="font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;background:{% if health == 'OK' %}rgba(0,255,136,0.12);color:#00ff88{% elif health == 'Warning' %}rgba(255,215,0,0.12);color:#ffd700{% else %}rgba(255,71,87,0.15);color:#ff4757{% endif %};">{{ health }}</span>
+            <button style="padding:3px 7px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;border-radius:4px;font-size:9px;cursor:pointer;"><i class="fas fa-rotate"></i></button>
+        </div>
+        {% endfor %}
+    </div></div>
+</div>
+
+<div class="tab-content" id="tab-workers">
+    <div class="card"><div class="card-header"><i class="fas fa-microchip" style="color:#a855f7;"></i><span class="card-title">Worker Pool ({{ stats.active_workers or 5 }} active / {{ stats.total_workers or 8 }})</span><span style="font-size:11px;color:var(--text-muted);">Last scaled: 2026-05-23 08:00</span></div>
+    <div class="table-responsive"><table class="table"><thead><tr><th>Worker ID</th><th>Queue</th><th>Status</th><th>Jobs Processed</th><th>Current Job</th><th>Memory</th><th>CPU</th><th>Uptime</th><th>Actions</th></tr></thead>
+    <tbody>
+        {% set workers = [
+            ('wkr-001', 'critical', 'active', 1248, 'THREAT_ANALYSIS', '128 MB', '34%', '14d 7h'),
+            ('wkr-002', 'critical', 'active', 1092, 'IOC_ENRICHMENT', '96 MB', '22%', '14d 7h'),
+            ('wkr-003', 'high', 'active', 876, 'ALERT_CORRELATION', '112 MB', '45%', '14d 7h'),
+            ('wkr-004', 'high', 'idle', 654, '—', '64 MB', '2%', '14d 7h'),
+            ('wkr-005', 'default', 'active', 432, 'REPORT_GENERATION', '156 MB', '67%', '7d 0h'),
+            ('wkr-006', 'default', 'active', 398, 'DATA_EXPORT', '88 MB', '18%', '7d 0h'),
+            ('wkr-007', 'default', 'idle', 201, '—', '48 MB', '1%', '3d 2h'),
+            ('wkr-008', 'batch', 'active', 145, 'DB_MAINTENANCE', '192 MB', '55%', '1d 12h'),
+        ] %}
+        {% for wid, queue, status, jobs, current, mem, cpu, uptime in workers %}
+        <tr>
+            <td style="font-family:monospace;font-size:11px;color:#a855f7;">{{ wid }}</td>
+            <td><span style="padding:2px 6px;background:{% if queue == 'critical' %}rgba(255,71,87,0.12);color:#ff4757{% elif queue == 'high' %}rgba(255,215,0,0.12);color:#ffd700{% elif queue == 'batch' %}rgba(0,212,255,0.12);color:#00d4ff{% else %}rgba(100,116,139,0.12);color:#64748b{% endif %};border-radius:3px;font-size:9px;">{{ queue }}</span></td>
+            <td><span style="color:{% if status == 'active' %}#00ff88{% else %}#64748b{% endif %};font-size:11px;font-weight:600;">{{ status|upper }}</span></td>
+            <td style="font-size:12px;color:var(--text-secondary);font-weight:500;">{{ jobs }}</td>
+            <td style="font-size:10px;font-family:monospace;color:#00d4ff;max-width:130px;overflow:hidden;text-overflow:ellipsis;">{{ current }}</td>
+            <td style="font-size:11px;color:var(--text-muted);">{{ mem }}</td>
+            <td><div style="display:flex;align-items:center;gap:4px;"><div style="width:40px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;"><div style="width:{{ cpu }};height:100%;background:{% if cpu|replace('%','')|int > 70 %}#ff4757{% elif cpu|replace('%','')|int > 40 %}#ffd700{% else %}#00ff88{% endif %};border-radius:2px;"></div></div><span style="font-size:9px;color:var(--text-muted);">{{ cpu }}</span></div></td>
+            <td style="font-size:10px;color:var(--text-muted);">{{ uptime }}</td>
+            <td><div class="d-flex gap-1"><button style="padding:3px 7px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-muted);border-radius:4px;font-size:9px;cursor:pointer;" title="Stop"><i class="fas fa-stop"></i></button><button style="padding:3px 7px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;border-radius:4px;font-size:9px;cursor:pointer;" title="Restart"><i class="fas fa-rotate"></i></button></div></td>
+        </tr>
+        {% endfor %}
+    </tbody></table></div></div>
+</div>
+
+<div class="tab-content" id="tab-logs">
+    <div class="card"><div class="card-header"><i class="fas fa-file-lines" style="color:#ffd700;"></i><span class="card-title">System Logs — Live Tail</span><div class="d-flex gap-2 ms-auto"><select class="filter-select" style="padding:4px 10px;font-size:10px;"><option>ALL</option><option>INFO</option><option>WARN</option><option>ERROR</option><option>DEBUG</option></select><button style="padding:4px 10px;background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.2);color:#00ff88;border-radius:6px;font-size:10px;cursor:pointer;"><i class="fas fa-circle" style="font-size:8px;"></i> LIVE</button><button style="padding:4px 10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-muted);border-radius:6px;font-size:10px;cursor:pointer;"><i class="fas fa-pause"></i></button></div></div>
+    <div style="max-height:500px;overflow-y:auto;padding:8px 0;background:rgba(0,0,0,0.2);" id="logContainer">
+        {% set logs = [
+            ('INFO', '2026-05-23 14:32:18', 'sentinel-api', 'Request GET /api/v1/alerts completed in 142ms'),
+            ('INFO', '2026-05-23 14:32:15', 'sentinel-worker', 'Job wkr-001: THREAT_ANALYSIS completed (3 alerts generated)'),
+            ('WARN', '2026-05-23 14:32:10', 'sentinel-ml', 'Model refresh delayed — current model still in use (TTL: 4m)'),
+            ('INFO', '2026-05-23 14:32:05', 'sentinel-api', 'Authenticated user jdoe from 10.0.1.15 (session: sess_8a3f)'),
+            ('ERROR','2026-05-23 14:31:58', 'sentinel-cache', 'Connection pool exhausted — 5 pending requests queued'),
+            ('INFO', '2026-05-23 14:31:55', 'sentinel-db', 'Query executed in 23ms — SELECT count(*) FROM alerts WHERE severity=\'critical\''),
+            ('WARN', '2026-05-23 14:31:50', 'sentinel-collector', 'Heartbeat timeout: WS-BOLT-12 (2.3s since last check)'),
+            ('INFO', '2026-05-23 14:31:45', 'sentinel-api', 'Alert #1059 created: Suspicious PowerShell on SRV-PROD-01'),
+            ('INFO', '2026-05-23 14:31:40', 'sentinel-worker', 'Job wkr-003: ALERT_CORRELATION started (scope: 24h)'),
+            ('ERROR','2026-05-23 14:31:35', 'sentinel-scheduler', 'Scheduled playbook check failed — timeout after 30s'),
+            ('INFO', '2026-05-23 14:31:30', 'sentinel-active-resp', 'Action: BLOCK_IP 185.234.72.1 on FW-PERIM-01 completed'),
+            ('WARN', '2026-05-23 14:31:25', 'sentinel-db', 'Slow query detected (1.8s): missing index on events.timestamp'),
+            ('INFO', '2026-05-23 14:31:20', 'sentinel-mq', 'Queue depth: critical=3, high=12, default=8, batch=24'),
+            ('DEBUG','2026-05-23 14:31:15', 'sentinel-ml', 'Feature vector computed for event evt_8921 in 4ms'),
+        ] %}
+        {% for level, ts, src, msg in logs %}
+        <div class="log-row" style="color:{% if level == 'ERROR' %}#ff4757{% elif level == 'WARN' %}#ffd700{% elif level == 'DEBUG' %}#a855f7{% else %}#00ff88{% endif %};">
+            <span style="font-weight:700;min-width:48px;display:inline-block;">[{{ level }}]</span>
+            <span style="color:var(--text-muted);min-width:150px;display:inline-block;">{{ ts }}</span>
+            <span style="color:#00d4ff;min-width:130px;display:inline-block;">{{ src }}</span>
+            <span style="color:var(--text-secondary);">{{ msg }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    <div style="padding:8px 14px;background:rgba(0,0,0,0.15);border-top:1px solid rgba(255,255,255,0.04);font-size:10px;color:var(--text-muted);">14 entries &middot; Auto-scroll: ON &middot; Buffer: 10,000 lines &middot; <a href="#" style="color:#00d4ff;" onclick="alert('Download system logs');return false;">Download full log</a></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+
+function adminAction(name) {
+    const flash = document.createElement('div');
+    flash.style.cssText = 'position:fixed;top:80px;right:20px;z-index:3000;background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;padding:12px 20px;border-radius:10px;font-size:13px;display:flex;align-items:center;gap:8px;';
+    flash.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + name + ' — action submitted';
+    document.body.appendChild(flash);
+    setTimeout(() => { flash.innerHTML = '<i class="fas fa-check-circle"></i> ' + name + ' — completed'; flash.style.background = 'rgba(0,255,136,0.15)'; flash.style.borderColor = 'rgba(0,255,136,0.3)'; flash.style.color = '#00ff88'; setTimeout(() => flash.remove(), 3000); }, 1500);
+}
+
+new Chart(document.getElementById('resourceChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: Array.from({length:24}, (_,i) => i + ':00'),
+        datasets: [
+            { label: 'CPU %', data: [23,21,19,18,17,20,25,35,52,68,72,65,58,55,60,70,78,75,62,48,38,30,26,22], borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.05)', fill: true, tension: 0.3, pointRadius: 2 },
+            { label: 'Memory %', data: [45,44,44,43,42,42,43,45,48,52,55,56,55,54,56,58,60,59,57,54,51,49,47,46], borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.05)', fill: true, tension: 0.3, pointRadius: 2 },
+            { label: 'Disk I/O %', data: [12,10,8,7,6,8,15,22,35,42,38,30,28,25,32,40,45,42,35,28,20,16,14,12], borderColor: '#00ff88', backgroundColor: 'rgba(0,255,136,0.05)', fill: true, tension: 0.3, pointRadius: 2 },
+        ]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, usePointStyle: true } } },
+        scales: { x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }, y: { max: 100, ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } } }
+    }
+});
+</script>
+{% endblock %}

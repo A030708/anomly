@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}BoltMart Shop{% endblock %}
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h1 class="bm-page-title">{% if selected %}{{ selected }}{% else %}All Products{% endif %}</h1>
+    <span style="color: var(--bm-text-muted); font-weight: 500;">{{ products|length }} items found</span>
+</div>
+
+<div style="display: flex; gap: 12px; margin-bottom: 32px; overflow-x: auto; padding-bottom: 8px;">
+    <a href="{{ url_for('shop') }}"
+       class="bm-badge {% if not selected %}bm-btn-primary{% else %}bm-btn-secondary{% endif %}" style="padding: 8px 16px; font-size: 14px;">
+        All
+    </a>
+    {% for cat in categories %}
+        <a href="{{ url_for('shop', category=cat) }}"
+           class="bm-badge {% if cat == selected %}bm-btn-primary{% else %}bm-btn-secondary{% endif %}" style="padding: 8px 16px; font-size: 14px;">
+            {{ cat }}
+        </a>
+    {% endfor %}
+</div>
+
+<div class="bm-grid">
+    {% for product in products %}
+    <div class="bm-card">
+        <div class="bm-image-placeholder" style="margin: -24px -24px 20px -24px; border-bottom-left-radius: 0; border-bottom-right-radius: 0;">
+            &#128295;
+        </div>
+        <div style="display: flex; flex-direction: column; flex-grow: 1;">
+            <span style="font-size: 12px; font-weight: 700; color: var(--bm-primary); text-transform: uppercase; letter-spacing: 0.5px;">{{ product.category }}</span>
+            <h3 class="bm-card-title" style="margin-top: 4px; margin-bottom: 8px; line-height: 1.2;">{{ product.name }}</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto; margin-bottom: 16px;">
+                <span class="bm-card-price" style="margin: 0;">&#8377;{{ "%.0f"|format(product.price) }}</span>
+                <span class="bm-badge {% if product.stock_count <= product.reorder_level %}bm-badge-out{% else %}bm-badge-stock{% endif %}">
+                    Stock: {{ product.stock_count }}
+                </span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <a href="{{ url_for('product_detail', sku=product.sku) }}"
+                   class="bm-btn bm-btn-secondary" style="flex: 1; padding: 10px;">
+                    View
+                </a>
+                <form method="POST" action="{{ url_for('add_to_cart') }}" style="flex: 1;">
+                    <input type="hidden" name="sku" value="{{ product.sku }}">
+                    <input type="hidden" name="quantity" value="1">
+                    <button type="submit"
+                            class="bm-btn bm-btn-primary" style="width: 100%; padding: 10px;"
+                            {% if product.stock_count <= 0 %}disabled style="background: #94a3b8; cursor: not-allowed;"{% endif %}>
+                        {% if product.stock_count <= 0 %}Out of Stock{% else %}Add to Cart{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

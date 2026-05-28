@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Order Placed - BoltMart{% endblock %}
+{% block content %}
+
+{% if order %}
+
+<div class="bm-glass-panel" style="max-width: 680px; margin: 40px auto; text-align: center; padding: 48px;">
+    <div style="margin-bottom: 24px;">
+        <div style="width: 80px; height: 80px; background: #dcfce7; color: #166534; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 32px; font-weight: 800;">
+            &#10003;
+        </div>
+        <h1 style="font-size: 28px; font-weight: 800; color: #166534; margin-bottom: 8px;">Order Confirmed!</h1>
+        <p style="color: var(--bm-text-muted);">Thank you for your purchase. A confirmation email has been sent.</p>
+    </div>
+
+    <div style="background: var(--bm-bg); padding: 24px; border-radius: var(--bm-radius-md); text-align: left; font-size: 14px; margin-bottom: 24px; border: 1px solid var(--bm-border);">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+                <span style="color: var(--bm-text-muted); font-size: 12px;">Order ID</span>
+                <p style="font-weight: 700; color: var(--bm-primary); font-family: monospace; margin: 2px 0;">{{ order.order_id }}</p>
+            </div>
+            <div>
+                <span style="color: var(--bm-text-muted); font-size: 12px;">Transaction ID</span>
+                <p style="font-weight: 600; font-family: monospace; margin: 2px 0;">
+                    {% if order.transaction_id %}
+                    {{ order.transaction_id }}
+                    {% else %}
+                    <span style="color: #94a3b8;">— (COD)</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <span style="color: var(--bm-text-muted); font-size: 12px;">Payment Method</span>
+                <p style="font-weight: 600; margin: 2px 0;">
+                    {% if order.payment_method == 'cod' %}
+                    <span style="background: #fef3c7; color: #92400e; padding: 2px 10px; border-radius: 12px; font-size: 12px;">Cash on Delivery</span>
+                    {% else %}
+                    <span style="background: #dcfce7; color: #166534; padding: 2px 10px; border-radius: 12px; font-size: 12px;">Paid Online</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <span style="color: var(--bm-text-muted); font-size: 12px;">Payment Status</span>
+                <p style="font-weight: 600; margin: 2px 0; text-transform: uppercase;">{{ order.payment_status }}</p>
+            </div>
+        </div>
+    </div>
+
+    {% if order["items"] %}
+    <div style="background: var(--bm-bg); border-radius: var(--bm-radius-md); margin-bottom: 24px; border: 1px solid var(--bm-border); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+                <tr style="background: #f8fafc;">
+                    <th style="padding: 12px 16px; text-align: left; color: #64748b; font-weight: 600;">Item</th>
+                    <th style="padding: 12px 16px; text-align: center; color: #64748b; font-weight: 600;">Qty</th>
+                    <th style="padding: 12px 16px; text-align: right; color: #64748b; font-weight: 600;">Price</th>
+                    <th style="padding: 12px 16px; text-align: right; color: #64748b; font-weight: 600;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order["items"] %}
+                <tr style="border-top: 1px solid #f1f5f9;">
+                    <td style="padding: 12px 16px;">
+                        <div style="font-weight: 600;">{{ item.name }}</div>
+                        <div style="font-size: 11px; color: #94a3b8; font-family: monospace;">{{ item.sku }}</div>
+                    </td>
+                    <td style="padding: 12px 16px; text-align: center;">{{ item.quantity }}</td>
+                    <td style="padding: 12px 16px; text-align: right;">&#8377;{{ "%.0f"|format(item.unit_price) }}</td>
+                    <td style="padding: 12px 16px; text-align: right; font-weight: 600;">&#8377;{{ "%.0f"|format(item.line_total) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div style="border-top: 2px solid var(--bm-primary); padding: 16px; text-align: right; background: #f8fafc;">
+            <span style="font-size: 13px; color: #64748b;">Total Amount: </span>
+            <span style="font-size: 20px; font-weight: 800; color: var(--bm-primary);">&#8377;{{ "%.0f"|format(order.total_value) }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <div style="background: var(--bm-bg); padding: 20px; border-radius: var(--bm-radius-md); text-align: left; margin-bottom: 24px; border: 1px solid var(--bm-border);">
+        <p style="font-weight: 700; margin-bottom: 8px; font-size: 14px;">Delivering To</p>
+        <p style="margin: 2px 0; font-size: 14px;">{{ order.customer_name }}</p>
+        <p style="margin: 2px 0; font-size: 13px; color: #475569;">{{ order.address }}</p>
+        <p style="margin: 2px 0; font-size: 13px; color: #475569;">{{ order.city }}{% if order.state %}, {{ order.state }}{% endif %} - {{ order.pincode }}</p>
+        <p style="margin: 2px 0; font-size: 13px; color: #475569;">{{ order.phone }} &middot; {{ order.email }}</p>
+    </div>
+
+    {% if not tracking_mode %}
+    <div style="font-size: 14px; color: var(--bm-text-muted); margin-bottom: 24px;">
+        We will update you via email at: <strong style="color: var(--bm-text-main);">{{ order.email }}</strong>
+    </div>
+    {% endif %}
+
+    <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+        <a href="{{ url_for('download_invoice', order_id=order.order_id) }}" class="bm-btn" style="background: #1e40af; color: white; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px;">
+            <i class="fas fa-file-invoice"></i> Download Invoice
+        </a>
+        <a href="{{ url_for('shop') }}" class="bm-btn bm-btn-primary" style="padding: 12px 24px; font-size: 14px;">
+            Continue Shopping
+        </a>
+        {% if tracking_mode %}
+        <a href="{{ url_for('track_order', order_id=order.order_id) }}" class="bm-btn bm-btn-secondary" style="padding: 12px 24px; font-size: 14px;">
+            Refresh Status
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{% if order.status %}
+<div class="bm-glass-panel" style="max-width: 680px; margin: 0 auto; padding: 32px;">
+    <h3 style="font-weight: 800; font-size: 18px; margin-bottom: 24px;">Order Timeline</h3>
+    <div style="position: relative;">
+        {% set steps = ['pending', 'assigned', 'packed', 'shipped', 'delivered'] %}
+        {% set step_names = {'pending': 'Placed', 'assigned': 'Assigned', 'packed': 'Packed', 'shipped': 'Shipped', 'delivered': 'Delivered'} %}
+        {% set current_idx = steps.index(order.status) if order.status in steps else 0 %}
+
+        {% for status in steps %}
+            {% set idx = loop.index0 %}
+            <div style="display: flex; align-items: flex-start; margin-bottom: 32px; position: relative;">
+                <div style="position: absolute; left: 0; width: 16px; height: 16px; border-radius: 50%; border: 2px solid {% if idx <= current_idx %}var(--bm-primary){% else %}#cbd5e1{% endif %}; background: {% if idx <= current_idx %}var(--bm-primary){% else %}white{% endif %}; margin-left: -7px; margin-top: 4px; z-index: 10;"></div>
+                {% if not loop.last %}
+                <div style="position: absolute; left: 1px; top: 16px; width: 2px; height: 100%; background: {% if idx < current_idx %}var(--bm-primary){% else %}#e2e8f0{% endif %};"></div>
+                {% endif %}
+                <div style="margin-left: 32px;">
+                    <p style="font-weight: 700; color: {% if idx <= current_idx %}var(--bm-text-main){% else %}#94a3b8{% endif %};">
+                        {{ step_names[status] }}
+                    </p>
+                    {% if idx == current_idx %}
+                        <p style="font-size: 13px; color: var(--bm-primary); font-weight: 500;">Currently processing...</p>
+                    {% elif idx < current_idx %}
+                        <p style="font-size: 13px; color: #166534;">Completed</p>
+                    {% else %}
+                        <p style="font-size: 13px; color: #94a3b8;">Pending</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="bm-glass-panel" style="text-align: center; padding: 64px; max-width: 500px; margin: 40px auto;">
+    <h2 class="bm-page-title" style="font-size: 24px; margin-bottom: 16px;">Order Not Found</h2>
+    <p style="color: var(--bm-text-muted); margin-bottom: 24px;">The order ID you are looking for does not exist.</p>
+    <a href="{{ url_for('home') }}" class="bm-btn bm-btn-secondary">Go Home</a>
+</div>
+{% endif %}
+
+{% endblock %}

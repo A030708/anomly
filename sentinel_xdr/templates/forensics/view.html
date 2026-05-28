@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Forensics - {{ platform_name }}{% endblock %}
+{% block page_title %}Forensic Analysis{% endblock %}
+{% block breadcrumb %}Forensics{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-bar { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .filter-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+    .filter-select option { background: #1a2035; }
+    .filter-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; outline: none; }
+    .filter-input:focus { border-color: #00d4ff; }
+    .filter-input::placeholder { color: rgba(255,255,255,0.35); }
+    .forensic-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; transition: all 0.2s; cursor: pointer; height: 100%; }
+    .forensic-card:hover { background: var(--bg-card-hover); border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+    .evidence-tag { padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 600; }
+    .tabs-nav { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .tab-pill { padding: 9px 18px; background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
+    .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
+    .tab-pill:hover { color: var(--text-primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .artifact-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; }
+    .artifact-row:last-child { border-bottom: none; }
+    .timeline-node { display: flex; gap: 12px; padding: 10px 0; border-left: 2px solid rgba(0,212,255,0.2); margin-left: 10px; padding-left: 20px; position: relative; }
+    .timeline-node::before { content: ''; position: absolute; left: -5px; top: 14px; width: 8px; height: 8px; border-radius: 50%; background: #00d4ff; }
+    .acquisition-progress { height: 6px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+    .acquisition-fill { height: 100%; border-radius: 3px; transition: width 0.6s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        ('Total Collections', stats.total or 32, '#e2e8f0', 'fas fa-folder-tree', 'rgba(0,212,255,0.08)'),
+        ('Pending Analysis', stats.pending or 8, '#ffd700', 'fas fa-clock', 'rgba(255,215,0,0.12)'),
+        ('In Progress', stats.in_progress or 5, '#00d4ff', 'fas fa-microscope', 'rgba(0,212,255,0.12)'),
+        ('Completed', stats.completed or 19, '#00ff88', 'fas fa-check-circle', 'rgba(0,255,136,0.1)'),
+        ('Artifacts Extracted', stats.artifacts or 247, '#a855f7', 'fas fa-cube', 'rgba(168,85,247,0.12)'),
+        ('Exhibits Filed', stats.exhibits or 34, '#ff6b35', 'fas fa-gavel', 'rgba(255,107,53,0.12)'),
+    ] %}
+    {% for label, value, color, icon, bg in kpis %}
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">{{ label }}</div>
+                    <div class="stat-value" style="color:{{ color }};font-size:22px;">{{ value }}</div>
+                </div>
+                <div class="stat-icon" style="background:{{ bg }};"><i class="{{ icon }}" style="color:{{ color }};"></i></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="tabs-nav">
+    <button class="tab-pill active" onclick="switchTab('collections', this)"><i class="fas fa-folder-tree"></i> Collections</button>
+    <button class="tab-pill" onclick="switchTab('artifacts', this)"><i class="fas fa-cube"></i> Artifacts</button>
+    <button class="tab-pill" onclick="switchTab('timeline', this)"><i class="fas fa-timeline"></i> Timeline</button>
+    <button class="tab-pill" onclick="switchTab('chain', this)"><i class="fas fa-link"></i> Chain of Custody</button>
+</div>
+
+<div class="tab-content active" id="tab-collections">
+    <div class="filter-bar">
+        <i class="fas fa-filter" style="color:var(--text-muted);"></i>
+        <input type="text" class="filter-input" placeholder="Search collections..." style="flex:1;min-width:200px;" id="colSearch" oninput="filterCollections()">
+        <select class="filter-select" id="statusColFilter" onchange="filterCollections()">
+            <option value="">All Status</option>
+            <option value="completed">Completed</option>
+            <option value="in_progress">In Progress</option>
+            <option value="pending">Pending</option>
+        </select>
+        <select class="filter-select" id="typeColFilter" onchange="filterCollections()">
+            <option value="">All Type</option>
+            <option value="memory">Memory</option><option value="disk">Disk</option><option value="network">Network</option><option value="registry">Registry</option>
+        </select>
+        <button class="btn-primary-custom" style="font-size:12px;padding:7px 14px;" onclick="alert('New forensic collection')"><i class="fas fa-plus"></i> New Collection</button>
+    </div>
+    <div class="row g-3" id="collectionGrid">
+        {% set collections = [
+            ('SRV-PROD-01 — Memory Dump', 'memory', 'completed', 'jdoe', '2026-05-23', '12 GB', '#00d4ff', 100),
+            ('WS-BOLT-12 — Full Disk Image', 'disk', 'in_progress', 'asmith', '2026-05-22', '240 GB', '#a855f7', 62),
+            ('FW-PERIM-01 — Config Export', 'network', 'completed', 'bwilson', '2026-05-22', '4 MB', '#00ff88', 100),
+            ('DC-MAIN-01 — Registry Hives', 'registry', 'pending', 'jdoe', '2026-05-21', '256 MB', '#ffd700', 0),
+            ('WS-WH-05 — Full Acquisition', 'disk', 'in_progress', 'asmith', '2026-05-20', '512 GB', '#ff4757', 44),
+            ('SRV-DB-03 — Volatile Data', 'memory', 'completed', 'bwilson', '2026-05-19', '8 GB', '#00d4ff', 100),
+            ('SRV-WEB-02 — Network Capture', 'network', 'pending', 'jdoe', '2026-05-18', '1.2 GB', '#ffd700', 0),
+            ('SRV-ADMIN-01 — Filesystem', 'disk', 'completed', 'asmith', '2026-05-17', '180 GB', '#a855f7', 100),
+        ] %}
+        {% for name, ftype, status, analyst, date, size, color, pct in collections %}
+        <div class="col-xl-3 col-lg-4 col-md-6 col-item" data-status="{{ status }}" data-type="{{ ftype }}">
+            <div class="forensic-card" onclick="alert('View collection: {{ name }}')">
+                <div class="d-flex justify-content-between mb-2">
+                    <span style="padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600;background:{{ color }}15;color:{{ color }};text-transform:uppercase;">{{ ftype }}</span>
+                    <span style="font-size:10px;color:var(--text-muted);">{{ size }}</span>
+                </div>
+                <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">{{ name }}</div>
+                <div style="font-size:11px;color:var(--text-muted);">{{ analyst }} &middot; {{ date }}</div>
+                <div class="acquisition-progress"><div class="acquisition-fill" style="width:{{ pct }}%;background:{{ color }};"></div></div>
+                <div class="d-flex justify-content-between mt-1">
+                    <span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:{% if status == 'completed' %}rgba(0,255,136,0.15);color:#00ff88{% elif status == 'in_progress' %}rgba(0,212,255,0.12);color:#00d4ff{% else %}rgba(255,215,0,0.12);color:#ffd700{% endif %};">{{ status|replace('_', ' ')|upper }}</span>
+                    <span style="font-size:11px;color:{{ color }};font-weight:700;">{{ pct }}%</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="tab-content" id="tab-artifacts">
+    <div class="card"><div class="card-header"><i class="fas fa-cube" style="color:#a855f7;"></i><span class="card-title">Extracted Artifacts ({{ stats.artifacts or 247 }})</span><input type="text" class="filter-input" placeholder="Filter artifacts..." style="padding:4px 10px;font-size:11px;width:180px;margin-left:auto;"></div>
+    <div class="table-responsive"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Source</th><th>Collection</th><th>Hash (SHA-256)</th><th>Size</th><th>Tags</th><th>Actions</th></tr></thead>
+    <tbody>
+        {% set artifacts = [
+            ('lsass.dmp', 'Memory Dump', 'SRV-PROD-01', 'MEM-2026-001', 'a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0', '128 MB', 'credential,process,lsass'),
+            ('autoruns.csv', 'Registry', 'WS-BOLT-12', 'REG-2026-003', 'd4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4', '2.3 MB', 'persistence,startup,autorun'),
+            ('netstat.log', 'Network', 'FW-PERIM-01', 'NET-2026-002', 'b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7', '456 KB', 'connection,c2,exfil'),
+            ('prefetch.zip', 'Prefetch', 'WS-WH-05', 'DISK-2026-004', 'f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1', '8.1 MB', 'execution,timeline,prefetch'),
+            ('evtx_export.evtx', 'Event Log', 'DC-MAIN-01', 'MEM-2026-001', 'e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5', '45 MB', 'logon,security,event'),
+            ('registry_hives.zip', 'Registry', 'WS-BOLT-12', 'REG-2026-003', 'c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0', '1.1 GB', 'hives,sam,system,software'),
+        ] %}
+        {% for name, atype, source, col, hash, size, tags in artifacts %}
+        <tr>
+            <td style="font-weight:500;font-family:monospace;font-size:12px;">{{ name }}</td>
+            <td><span class="evidence-tag" style="background:rgba(168,85,247,0.12);color:#a855f7;">{{ atype }}</span></td>
+            <td style="font-size:12px;color:#00d4ff;">{{ source }}</td>
+            <td style="font-size:11px;font-family:monospace;color:var(--text-muted);">{{ col }}</td>
+            <td style="font-size:9px;font-family:monospace;color:var(--text-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;" title="{{ hash }}">{{ hash[:16] }}...</td>
+            <td style="font-size:11px;color:var(--text-secondary);">{{ size }}</td>
+            <td><div class="d-flex gap-1 flex-wrap">{% for t in tags.split(',') %}<span style="padding:1px 5px;background:rgba(255,255,255,0.06);border-radius:3px;font-size:8px;color:var(--text-muted);">{{ t }}</span>{% endfor %}</div></td>
+            <td>
+                <div class="d-flex gap-1">
+                    <button style="padding:4px 7px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;border-radius:4px;font-size:9px;cursor:pointer;" title="Download"><i class="fas fa-download"></i></button>
+                    <button style="padding:4px 7px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2);color:#a855f7;border-radius:4px;font-size:9px;cursor:pointer;" title="Analyze"><i class="fas fa-microscope"></i></button>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody></table></div></div>
+</div>
+
+<div class="tab-content" id="tab-timeline">
+    <div class="card"><div class="card-header"><i class="fas fa-timeline" style="color:#ffd700;"></i><span class="card-title">Forensic Timeline — SRV-PROD-01</span><div><select class="filter-select" style="padding:4px 10px;font-size:10px;"><option>All Events</option><option>Process</option><option>Network</option><option>File</option><option>Registry</option></select></div></div>
+    <div class="card-body" style="max-height:560px;overflow-y:auto;">
+        {% set events = [
+            ('2026-05-23 10:15:22', 'Process Create', 'powershell.exe -enc SQBFAFgA...', '#ff4757', 'HIGH'),
+            ('2026-05-23 10:14:55', 'Network Connection', 'Outbound to 185.234.72.1:443 — TLS handshake', '#ffd700', 'MEDIUM'),
+            ('2026-05-23 10:14:30', 'File Write', 'C:\\Users\\Public\\svchost.exe (48 KB) — not signed', '#ff6b35', 'HIGH'),
+            ('2026-05-23 10:12:08', 'Scheduled Task', 'Created "Updater" task → C:\\Windows\\Tasks\\malware.exe', '#00d4ff', 'CRITICAL'),
+            ('2026-05-23 09:58:44', 'Registry Change', 'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\WindowsUpdate', '#a855f7', 'MEDIUM'),
+            ('2026-05-23 09:55:12', 'Process Create', 'wmiprvse.exe spawned cmd.exe → schtasks', '#ffd700', 'HIGH'),
+            ('2026-05-23 09:45:30', 'File Delete', 'C:\\Windows\\Temp\\*.tmp (47 files) — cleanup after dropper', '#ffd700', 'LOW'),
+            ('2026-05-23 09:30:00', 'Logon Event', 'User jdoe from 10.0.7.5 (RDP) — successful', '#00ff88', 'INFO'),
+            ('2026-05-23 09:28:15', 'Service Create', 'WindowsUpdateService — points to unsigned binary', '#ff4757', 'CRITICAL'),
+            ('2026-05-23 09:20:00', 'Process Create', 'rundll32.exe — suspicious DLL load from AppData', '#ff6b35', 'HIGH'),
+        ] %}
+        {% for ts, etype, detail, color, severity in events %}
+        <div class="timeline-node" style="border-left-color:{{ color }}44;">
+            <div style="min-width:150px;font-size:11px;font-family:monospace;color:var(--text-muted);">{{ ts }}</div>
+            <div style="min-width:120px;"><span style="padding:2px 6px;border-radius:3px;font-size:9px;background:{{ color }}22;color:{{ color }};">{{ etype }}</span><br><span style="font-size:8px;color:{{ color }};">{{ severity }}</span></div>
+            <div style="font-size:11px;color:var(--text-secondary);">{{ detail }}</div>
+        </div>
+        {% endfor %}
+    </div></div>
+</div>
+
+<div class="tab-content" id="tab-chain">
+    <div class="card"><div class="card-header"><i class="fas fa-link" style="color:#00ff88;"></i><span class="card-title">Chain of Custody — Evidence Log</span><button class="btn-primary-custom" style="font-size:11px;padding:5px 12px;" onclick="alert('Add chain of custody entry')"><i class="fas fa-plus"></i> Add Entry</button></div>
+    <div class="table-responsive"><table class="table"><thead><tr><th>Evidence ID</th><th>Description</th><th>Collected By</th><th>Date/Time</th><th>Location</th><th>Hash</th><th>Status</th></tr></thead>
+    <tbody>
+        {% set chain = [
+            ('EVD-001', 'Memory Dump — SRV-PROD-01', 'jdoe', '2026-05-23 10:30', 'SRV-PROD-01 /datacenter', 'SHA256: a3f8b2c1...', 'Sealed'),
+            ('EVD-002', 'Disk Image — WS-BOLT-12', 'asmith', '2026-05-22 14:00', 'WS-BOLT-12 /floor-2', 'SHA256: d4e5f6a7...', 'In Transfer'),
+            ('EVD-003', 'Firewall Config — FW-PERIM-01', 'bwilson', '2026-05-22 09:15', 'FW-PERIM-01 /dmz', 'SHA256: b7c8d9e0...', 'Sealed'),
+            ('EVD-004', 'Registry Hives — DC-MAIN-01', 'jdoe', '2026-05-21 16:45', 'DC-MAIN-01 /server-room', 'SHA256: e5f6a7b8...', 'Pending'),
+            ('EVD-005', 'Network Capture — SRV-WEB-02', 'asmith', '2026-05-20 11:30', 'SRV-WEB-02 /cloud', 'SHA256: c9d0e1f2...', 'Analyzing'),
+        ] %}
+        {% for eid, desc, by, dt, loc, hash, status in chain %}
+        <tr>
+            <td style="font-family:monospace;font-size:11px;color:#a855f7;">{{ eid }}</td>
+            <td style="font-size:12px;">{{ desc }}</td>
+            <td style="font-size:12px;color:#00d4ff;">{{ by }}</td>
+            <td style="font-size:11px;color:var(--text-muted);">{{ dt }}</td>
+            <td style="font-size:11px;color:var(--text-secondary);">{{ loc }}</td>
+            <td style="font-size:9px;font-family:monospace;color:var(--text-muted);">{{ hash }}</td>
+            <td><span style="padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600;background:{% if status == 'Sealed' %}rgba(0,255,136,0.15);color:#00ff88{% elif status == 'Analyzing' %}rgba(0,212,255,0.12);color:#00d4ff{% elif status == 'In Transfer' %}rgba(255,215,0,0.12);color:#ffd700{% else %}rgba(100,116,139,0.12);color:#64748b{% endif %};">{{ status|upper }}</span></td>
+        </tr>
+        {% endfor %}
+    </tbody></table></div></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+
+function filterCollections() {
+    const search = document.getElementById('colSearch').value.toLowerCase();
+    const status = document.getElementById('statusColFilter').value;
+    const type = document.getElementById('typeColFilter').value;
+    document.querySelectorAll('.col-item').forEach(item => {
+        const text = item.textContent.toLowerCase();
+        const s = item.dataset.status;
+        const t = item.dataset.type;
+        item.style.display = (!search || text.includes(search)) && (!status || s === status) && (!type || t === type) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

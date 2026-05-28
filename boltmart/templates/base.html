@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BoltMart{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<nav class="bm-navbar">
+    <div class="bm-container">
+        <div class="bm-nav-content">
+            <a href="{{ url_for('home') }}" class="bm-brand">
+                <i class="fas fa-bolt" style="color:var(--bm-secondary)"></i> BOLTMART
+            </a>
+            <div class="bm-nav-links">
+                <a href="{{ url_for('home') }}" class="bm-nav-link">Home</a>
+                <a href="{{ url_for('shop') }}" class="bm-nav-link">Shop</a>
+                <a href="{{ url_for('view_cart') }}" class="bm-nav-link">
+                    <i class="fas fa-shopping-cart"></i> Cart
+                    {% if session.get('cart') %}
+                        <span class="bm-cart-badge">{{ session.get('cart')|length }}</span>
+                    {% endif %}
+                </a>
+                <a href="{{ url_for('track_search') }}" class="bm-nav-link">Track Order</a>
+                {% if g.customer %}
+                    <a href="{{ url_for('logout') }}" class="bm-nav-link">Logout ({{ g.customer.name }})</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="bm-nav-link">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="bm-container" style="margin-top:20px;">
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="bm-alert bm-alert-info">
+                    <i class="fas fa-info-circle"></i> {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>
+
+<main class="bm-container bm-main">
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="bm-footer">
+    <div class="bm-container">
+        <p>&copy; 2026 BoltMart Hardware Supplies. All rights reserved.</p>
+        <p class="powered-by">Powered by Secure Sentinel Monitoring</p>
+    </div>
+</footer>
+
+</body>
+</html>
