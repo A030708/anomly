@@ -21,7 +21,13 @@
     <div style="display: flex; flex-direction: column; gap: 16px;">
         {% for item in cart %}
         <div style="background: var(--bm-surface); padding: 16px; border-radius: var(--bm-radius-md); border: 1px solid var(--bm-border); display: flex; align-items: center; gap: 16px;">
-            <div class="bm-image-placeholder" style="width: 80px; height: 80px; font-size: 24px; border-radius: var(--bm-radius-sm);">&#128295;</div>
+            <div style="width: 80px; height: 80px; border-radius: var(--bm-radius-sm); overflow: hidden; background: #f1f5f9; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                {% if item.image_url %}
+                <img src="{{ item.image_url }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                {% else %}
+                <span style="font-size: 24px;">&#128295;</span>
+                {% endif %}
+            </div>
 
             <div style="flex-grow: 1;">
                 <h3 style="font-weight: 700; margin-bottom: 4px;">{{ item.name }}</h3>

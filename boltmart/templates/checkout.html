@@ -9,36 +9,59 @@
     <div>
         <form method="POST" action="{{ url_for('checkout') }}" style="display: flex; flex-direction: column; gap: 32px;">
 
+            {% if saved_addresses %}
+            <div style="background: var(--bm-surface); padding: 24px; border-radius: var(--bm-radius-lg); border: 1px solid var(--bm-border); border-top: 4px solid var(--bm-secondary);">
+                <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 16px; color: var(--bm-secondary);"><i class="fas fa-map-marker-alt"></i> Saved Addresses</h3>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    {% for addr in saved_addresses %}
+                    <div style="padding: 12px; border: 1px solid var(--bm-border); border-radius: var(--bm-radius-md); cursor: pointer; transition: 0.2s;"
+                         onclick="fillAddress({{ addr|tojson|safe }})"
+                         onmouseover="this.style.borderColor='var(--bm-primary)'"
+                         onmouseout="this.style.borderColor='var(--bm-border)'">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <span class="bm-badge" style="background: var(--bm-primary); color: white; font-size: 11px;">{{ addr.label }}</span>
+                            {% if addr.is_default %}
+                            <span class="bm-badge" style="background: #166534; color: white; font-size: 11px;">Default</span>
+                            {% endif %}
+                        </div>
+                        <p style="font-weight: 600; font-size: 14px;">{{ addr.name }}</p>
+                        <p style="font-size: 13px; color: var(--bm-text-muted);">{{ addr.address_line }}, {{ addr.city }}, {{ addr.state }} - {{ addr.pincode }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <fieldset style="background: var(--bm-surface); padding: 32px; border-radius: var(--bm-radius-lg); border: 1px solid var(--bm-border); border-top: 4px solid var(--bm-primary); box-shadow: var(--bm-shadow-sm);">
                 <legend style="font-weight: 800; font-size: 20px; padding: 0 8px; margin-bottom: 24px; color: var(--bm-primary);">Delivery Information</legend>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
                     <div>
                         <label class="bm-label">Full Name *</label>
-                        <input type="text" name="name" required placeholder="Rahul Sharma" class="bm-input" value="{{ g.customer.name if g.customer else '' }}">
+                        <input type="text" name="name" id="addr_name" required placeholder="Rahul Sharma" class="bm-input" value="{{ g.customer.name if g.customer else '' }}">
                     </div>
                     <div>
                         <label class="bm-label">Mobile Number *</label>
-                        <input type="tel" name="phone" required pattern="[0-9]{10}" placeholder="9876543210" class="bm-input" value="{{ g.customer.phone if g.customer else '' }}">
+                        <input type="tel" name="phone" id="addr_phone" required pattern="[0-9]{10}" placeholder="9876543210" class="bm-input" value="{{ g.customer.phone if g.customer else '' }}">
                     </div>
                     <div style="grid-column: 1 / -1;">
                         <label class="bm-label">Email *</label>
-                        <input type="email" name="email" required placeholder="rahul@example.com" class="bm-input" value="{{ g.customer.email if g.customer else '' }}" {% if g.customer %}readonly{% endif %}>
+                        <input type="email" name="email" id="addr_email" required placeholder="rahul@example.com" class="bm-input" value="{{ g.customer.email if g.customer else '' }}" {% if g.customer %}readonly{% endif %}>
                     </div>
                     <div style="grid-column: 1 / -1;">
                         <label class="bm-label">Delivery Address *</label>
-                        <textarea name="address" required rows="2" placeholder="Flat 4B, Sunrise Apartments, Near City Mall..." class="bm-input"></textarea>
+                        <textarea name="address" id="addr_line" required rows="2" placeholder="Flat 4B, Sunrise Apartments, Near City Mall..." class="bm-input"></textarea>
                     </div>
                     <div>
                         <label class="bm-label">City *</label>
-                        <input type="text" name="city" required placeholder="Pune" class="bm-input">
+                        <input type="text" name="city" id="addr_city" required placeholder="Pune" class="bm-input">
                     </div>
                     <div>
                         <label class="bm-label">State *</label>
-                        <input type="text" name="state" required placeholder="Maharashtra" class="bm-input">
+                        <input type="text" name="state" id="addr_state" required placeholder="Maharashtra" class="bm-input">
                     </div>
                     <div>
                         <label class="bm-label">Pincode *</label>
-                        <input type="text" name="pincode" required pattern="[0-9]{6}" placeholder="411001" class="bm-input">
+                        <input type="text" name="pincode" id="addr_pincode" required pattern="[0-9]{6}" placeholder="411001" class="bm-input">
                     </div>
                 </div>
             </fieldset>
@@ -51,28 +74,22 @@
                         <i class="fas fa-exclamation-circle"></i> {{ error }}
                     </div>
                     {% endif %}
+
+                    <!-- Pay Online (Razorpay) -->
                     <label style="display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid var(--bm-border); border-radius: var(--bm-radius-md); cursor: pointer; transition: all 0.2s;">
-                        <input type="radio" name="payment_method" value="online" checked style="width: 20px; height: 20px; accent-color: #166534;" onchange="document.getElementById('card-details').style.display='block'">
+                        <input type="radio" name="payment_method" value="online" checked style="width: 20px; height: 20px; accent-color: #166534;">
                         <div>
                             <span style="font-weight: 700; font-size: 16px;">&#128179; Pay Online</span>
-                            <p style="font-size: 13px; color: var(--bm-text-muted); margin-top: 4px;">Credit Card, UPI, Net Banking (Test Mode)</p>
+                            <p style="font-size: 13px; color: var(--bm-text-muted); margin-top: 4px;">Cards, UPI, Net Banking, Wallet — powered by Razorpay</p>
                         </div>
                     </label>
-                    
-                    <div id="card-details" style="padding: 0 20px 20px 20px;">
-                        <label class="bm-label">Card Number (Simulation: Starts with 4000 = Fail)</label>
-                        <input type="text" name="card_number" class="bm-input" placeholder="4111 1111 1111 1111">
-                    </div>
+
+                    <!-- Wallet (via Razorpay) -->
                     <label style="display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid var(--bm-border); border-radius: var(--bm-radius-md); cursor: pointer; transition: all 0.2s;">
-                        <input type="radio" name="payment_method" value="cod"
-                               {% if total > 10000 %}disabled{% endif %}
-                               style="width: 20px; height: 20px; accent-color: #166534;" onchange="document.getElementById('card-details').style.display='none'">
-                        <div style="{% if total > 10000 %}opacity: 0.5;{% endif %}">
-                            <span style="font-weight: 700; font-size: 16px;">&#128666; Cash on Delivery</span>
-                            <p style="font-size: 13px; color: var(--bm-text-muted); margin-top: 4px;">
-                                Pay when you receive
-                                {% if total > 10000 %}(Not available above &#8377;10,000){% else %}(Available){% endif %}
-                            </p>
+                        <input type="radio" name="payment_method" value="wallet" style="width: 20px; height: 20px; accent-color: #166534;">
+                        <div>
+                            <span style="font-weight: 700; font-size: 16px;">&#128181; Wallet</span>
+                            <p style="font-size: 13px; color: var(--bm-text-muted); margin-top: 4px;">Paytm, Amazon Pay, MobiKwik via Razorpay</p>
                         </div>
                     </label>
                 </div>
@@ -84,6 +101,17 @@
         </form>
     </div>
 
+<script>
+function fillAddress(addr) {
+    document.getElementById('addr_name').value = addr.name || '';
+    document.getElementById('addr_phone').value = addr.phone || '';
+    document.getElementById('addr_line').value = addr.address_line || '';
+    document.getElementById('addr_city').value = addr.city || '';
+    document.getElementById('addr_state').value = addr.state || '';
+    document.getElementById('addr_pincode').value = addr.pincode || '';
+}
+</script>
+
     <div>
         <div style="background: var(--bm-surface); padding: 32px; border-radius: var(--bm-radius-lg); box-shadow: var(--bm-shadow-md); position: sticky; top: 100px;">
             <h3 style="font-weight: 800; font-size: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--bm-border); padding-bottom: 16px;">Order Summary</h3>
@@ -93,7 +121,22 @@
                 <span style="font-weight: 600;">&#8377;{{ "%.0f"|format(item.price * item.quantity) }}</span>
             </div>
             {% endfor %}
-            <div style="padding-top: 24px; display: flex; flex-direction: column; gap: 12px; font-size: 15px;">
+            <!-- Coupon Code -->
+            <div style="padding: 16px 0; border-top: 1px solid var(--bm-border);">
+                <form method="POST" action="{{ url_for('checkout') }}" style="display: flex; gap: 8px;">
+                    <input type="hidden" name="action" value="apply_coupon">
+                    <input type="text" name="coupon_code" value="{{ coupon_code or '' }}" class="bm-input" placeholder="Coupon code" style="flex: 1; padding: 8px; font-size: 13px; text-transform: uppercase;">
+                    <button type="submit" class="bm-btn bm-btn-secondary" style="padding: 8px 12px; font-size: 13px;">Apply</button>
+                </form>
+                {% if coupon_error %}
+                <p style="color: #e53e3e; font-size: 12px; margin-top: 4px;">{{ coupon_error }}</p>
+                {% endif %}
+                {% if coupon_code %}
+                <p style="color: #166534; font-size: 12px; margin-top: 4px;">&#10003; Coupon applied!</p>
+                {% endif %}
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px;">
                 <div style="display: flex; justify-content: space-between;">
                     <span style="color: var(--bm-text-muted);">Subtotal</span>
                     <span style="font-weight: 600;">&#8377;{{ "%.0f"|format(subtotal) }}</span>
@@ -104,6 +147,12 @@
                         {% if delivery_charge == 0 %}FREE{% else %}&#8377;{{ "%.0f"|format(delivery_charge) }}{% endif %}
                     </span>
                 </div>
+                {% if coupon_code and coupon_discount %}
+                <div style="display: flex; justify-content: space-between; color: #166534;">
+                    <span style="font-weight: 600;">Discount</span>
+                    <span style="font-weight: 700;">-&#8377;{{ "%.0f"|format(coupon_discount) }}</span>
+                </div>
+                {% endif %}
                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--bm-border); padding-top: 24px; margin-top: 12px;">
                     <span style="font-size: 18px; font-weight: 700;">Total</span>
                     <span style="font-size: 24px; font-weight: 800; color: #166534;">&#8377;{{ "%.0f"|format(total) }}</span>

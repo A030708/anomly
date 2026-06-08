@@ -9,8 +9,12 @@
 </nav>
 
 <div class="bm-detail-layout">
-    <div class="bm-image-placeholder" style="aspect-ratio: 1; height: 100%;">
-        &#128295;
+    <div style="aspect-ratio: 1; height: 100%; background: #f1f5f9; border-radius: var(--bm-radius-lg); overflow: hidden; display: flex; align-items: center; justify-content: center;">
+        {% if product.image_url %}
+        <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+        {% else %}
+        <div style="font-size: 64px;">&#128295;</div>
+        {% endif %}
     </div>
     <div style="background: var(--bm-surface); padding: 40px; border-radius: var(--bm-radius-lg); box-shadow: var(--bm-shadow-sm);">
         <span style="font-size: 12px; font-weight: 700; color: var(--bm-primary); text-transform: uppercase; letter-spacing: 0.5px;">{{ product.category }}</span>
@@ -25,7 +29,16 @@
                     {{ product.stock_count }} in stock
                 </span>
             </p>
-            <p style="font-size: 15px;"><strong style="color: var(--bm-text-main);">Category:</strong> {{ product.category }}</p>
+            <p style="margin-bottom: 8px; font-size: 15px;"><strong style="color: var(--bm-text-main);">Category:</strong> {{ product.category }}</p>
+            {% if avg_rating %}
+            <p style="margin-bottom: 8px; font-size: 15px;"><strong style="color: var(--bm-text-main);">Rating:</strong>
+                <span style="color: #f59e0b;">
+                {% for i in range(avg_rating|int) %}&#9733;{% endfor %}{% for i in range(5 - avg_rating|int) %}&#9734;{% endfor %}
+                </span>
+                <span style="color: var(--bm-text-muted); font-size: 13px;">({{ reviews|length }} review{% if reviews|length != 1 %}s{% endif %})</span>
+            </p>
+            {% endif %}
+            <p style="margin-bottom: 8px; font-size: 15px; color: #1e40af;"><strong style="color: var(--bm-text-main);">Delivery Estimate:</strong> &#128666; 3-5 business days</p>
         </div>
         
         <form method="POST" action="{{ url_for('add_to_cart') }}">
@@ -41,7 +54,85 @@
                 Add to Cart — &#8377;{{ "%.0f"|format(product.price) }}
             </button>
         </form>
+        <form method="POST" action="{{ url_for('add_to_wishlist', sku=product.sku) }}" style="margin-top: 8px;">
+            <button type="submit" class="bm-btn bm-btn-secondary" style="width: 100%; padding: 12px; font-size: 15px;">
+                <i class="fas fa-heart"></i> Add to Wishlist
+            </button>
+        </form>
     </div>
+</div>
+
+<!-- Reviews Section -->
+<div style="margin-top: 48px;">
+    <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 24px; border-bottom: 1px solid var(--bm-border); padding-bottom: 12px;">
+        <i class="fas fa-star" style="color: #f59e0b;"></i> Customer Reviews
+        {% if avg_rating %}
+        <span style="font-size: 16px; font-weight: 400; color: var(--bm-text-muted); margin-left: 8px;">
+            {{ avg_rating }} / 5 ({{ reviews|length }} review{% if reviews|length != 1 %}s{% endif %})
+        </span>
+        {% endif %}
+    </h2>
+
+    {% if g.customer %}
+    <div style="background: var(--bm-surface); padding: 24px; border-radius: var(--bm-radius-lg); border: 1px solid var(--bm-border); margin-bottom: 32px;">
+        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Write a Review</h3>
+        <form method="POST" action="{{ url_for('submit_review', sku=product.sku) }}">
+            <div style="display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+                <div class="bm-form-group" style="flex: 1;">
+                    <label class="bm-label">Rating</label>
+                    <select name="rating" class="bm-input" required>
+                        <option value="5">&#9733;&#9733;&#9733;&#9733;&#9733; Excellent</option>
+                        <option value="4">&#9733;&#9733;&#9733;&#9733; Good</option>
+                        <option value="3">&#9733;&#9733;&#9733; Average</option>
+                        <option value="2">&#9733;&#9733; Poor</option>
+                        <option value="1">&#9733; Terrible</option>
+                    </select>
+                </div>
+                <div class="bm-form-group" style="flex: 2;">
+                    <label class="bm-label">Title</label>
+                    <input type="text" name="title" class="bm-input" placeholder="Summary of your review" maxlength="100">
+                </div>
+            </div>
+            <div class="bm-form-group" style="margin-bottom: 16px;">
+                <label class="bm-label">Your Review</label>
+                <textarea name="comment" class="bm-input" rows="3" placeholder="Share your experience with this product..." required style="resize: vertical;"></textarea>
+            </div>
+            <button type="submit" class="bm-btn bm-btn-primary">Submit Review</button>
+        </form>
+    </div>
+    {% else %}
+    <div style="background: var(--bm-surface); padding: 24px; border-radius: var(--bm-radius-lg); border: 1px dashed var(--bm-border); text-align: center; margin-bottom: 32px;">
+        <p style="color: var(--bm-text-muted);">
+            <a href="{{ url_for('login') }}" class="bm-nav-link" style="font-weight: 600;">Login</a> to write a review.
+        </p>
+    </div>
+    {% endif %}
+
+    {% if reviews %}
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+        {% for review in reviews %}
+        <div style="background: var(--bm-surface); padding: 20px; border-radius: var(--bm-radius-md); border: 1px solid var(--bm-border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div>
+                    <strong>{{ review.customer_name }}</strong>
+                    <span style="color: #f59e0b; margin-left: 8px;">
+                        {% for i in range(review.rating) %}&#9733;{% endfor %}{% for i in range(5 - review.rating) %}&#9734;{% endfor %}
+                    </span>
+                </div>
+                <span style="font-size: 12px; color: var(--bm-text-muted);">{{ review.created_at[:10] }}</span>
+            </div>
+            {% if review.title %}
+            <p style="font-weight: 600; margin-bottom: 4px;">{{ review.title }}</p>
+            {% endif %}
+            <p style="color: var(--bm-text-muted); font-size: 14px; line-height: 1.6;">{{ review.comment }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 32px; color: var(--bm-text-muted);">
+        <p>No reviews yet. Be the first to review this product!</p>
+    </div>
+    {% endif %}
 </div>
 
 {% endblock %}

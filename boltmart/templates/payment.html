@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Pay - BoltMart{% endblock %}
+{% block content %}
+
+<div style="max-width: 500px; margin: 60px auto; text-align: center;">
+    <div class="bm-card" style="padding: 40px;">
+
+        <div style="font-size: 48px; margin-bottom: 16px;">&#128179;</div>
+        <h2 style="margin-top: 0; color: var(--bm-primary);">Complete Payment</h2>
+        <p style="color: var(--bm-text-muted); margin-bottom: 24px;">
+            Order: <strong>{{ order.order_id }}</strong>
+        </p>
+
+        <div style="font-size: 32px; font-weight: 800; color: #166534; margin-bottom: 32px;">
+            &#8377;{{ "%.0f"|format(order.total_value) }}
+        </div>
+
+        {% if error %}
+        <div class="bm-alert" style="background:#fff5f5; color:#e53e3e; border-left:4px solid #e53e3e; padding:12px; margin-bottom: 20px;">
+            <i class="fas fa-exclamation-circle"></i> {{ error }}
+        </div>
+        {% endif %}
+
+        {% if razorpay_key and razorpay_order_id %}
+        <button id="pay-btn" class="bm-btn bm-btn-accent" style="width: 100%; padding: 16px; font-size: 18px;">
+            Pay &#8377;{{ "%.0f"|format(order.total_value) }}
+        </button>
+
+        <form id="payment-form" method="POST" action="{{ url_for('payment_callback', order_id=order.order_id) }}">
+            <input type="hidden" name="razorpay_payment_id" id="razorpay_payment_id">
+            <input type="hidden" name="razorpay_order_id" id="razorpay_order_id">
+            <input type="hidden" name="razorpay_signature" id="razorpay_signature">
+        </form>
+
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+        <script>
+        var options = {
+            key: "{{ razorpay_key }}",
+            amount: "{{ (order.total_value * 100)|int }}",
+            currency: "INR",
+            name: "BoltMart",
+            description: "Order {{ order.order_id }}",
+            order_id: "{{ razorpay_order_id }}",
+            handler: function(response) {
+                document.getElementById('razorpay_payment_id').value = response.razorpay_payment_id;
+                document.getElementById('razorpay_order_id').value = response.razorpay_order_id;
+                document.getElementById('razorpay_signature').value = response.razorpay_signature;
+                document.getElementById('payment-form').submit();
+            },
+            modal: {
+                ondismiss: function() {
+                    document.getElementById('pay-btn').disabled = false;
+                    document.getElementById('pay-btn').textContent = 'Retry Payment';
+                }
+            },
+            theme: { color: "#1a56db" }
+        };
+        var rzp = new Razorpay(options);
+        document.getElementById('pay-btn').onclick = function(e) {
+            this.disabled = true;
+            this.textContent = 'Opening Payment...';
+            rzp.open();
+            e.preventDefault();
+        };
+        </script>
+        {% else %}
+        <a href="{{ url_for('order_confirmation', order_id=order.order_id) }}" class="bm-btn bm-btn-primary" style="width: 100%;">
+            View Order
+        </a>
+        {% endif %}
+
+        <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--bm-border);">
+            <p style="font-size: 13px; color: var(--bm-text-muted);">
+                <i class="fas fa-lock"></i> Secured by Razorpay
+            </p>
+            <p style="font-size: 12px; color: var(--bm-text-muted); margin-top: 4px;">
+                Your payment information is securely processed.
+            </p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

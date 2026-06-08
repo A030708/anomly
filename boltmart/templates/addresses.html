@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}My Addresses - BoltMart{% endblock %}
+{% block content %}
+
+<div style="max-width: 800px; margin: 40px auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+        <h1 class="bm-page-title" style="margin-bottom: 0;">My Addresses</h1>
+        <a href="{{ url_for('profile') }}" class="bm-nav-link" style="font-weight: 600;">&larr; Back to Profile</a>
+    </div>
+
+    <!-- Add Address Form -->
+    <div class="bm-card" style="margin-bottom: 32px;">
+        <h2 style="font-size: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--bm-border); padding-bottom: 12px;">Add New Address</h2>
+        <form method="POST" action="{{ url_for('add_address') }}">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="bm-form-group">
+                    <label class="bm-label">Label</label>
+                    <select name="label" class="bm-input">
+                        <option value="Home">Home</option>
+                        <option value="Work">Work</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="bm-form-group">
+                    <label class="bm-label">Full Name</label>
+                    <input type="text" name="name" class="bm-input" value="{{ g.customer.name }}" required>
+                </div>
+                <div class="bm-form-group">
+                    <label class="bm-label">Phone</label>
+                    <input type="tel" name="phone" class="bm-input" value="{{ g.customer.phone }}" required>
+                </div>
+                <div class="bm-form-group">
+                    <label class="bm-label">Pincode</label>
+                    <input type="text" name="pincode" class="bm-input" required>
+                </div>
+            </div>
+            <div class="bm-form-group">
+                <label class="bm-label">Address</label>
+                <input type="text" name="address_line" class="bm-input" placeholder="Street, building, area" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="bm-form-group">
+                    <label class="bm-label">City</label>
+                    <input type="text" name="city" class="bm-input" required>
+                </div>
+                <div class="bm-form-group">
+                    <label class="bm-label">State</label>
+                    <input type="text" name="state" class="bm-input" required>
+                </div>
+            </div>
+            <div class="bm-form-group" style="margin-top: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="is_default">
+                    <span style="font-size: 14px;">Set as default address</span>
+                </label>
+            </div>
+            <button type="submit" class="bm-btn bm-btn-primary" style="margin-top: 8px;">Add Address</button>
+        </form>
+    </div>
+
+    <!-- Saved Addresses -->
+    {% if addresses %}
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+        {% for addr in addresses %}
+        <div style="background: var(--bm-surface); padding: 20px; border-radius: var(--bm-radius-md); border: 1px solid var(--bm-border); display: flex; justify-content: space-between; align-items: start;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span class="bm-badge" style="background: var(--bm-primary); color: white; font-size: 11px;">{{ addr.label }}</span>
+                    {% if addr.is_default %}
+                    <span class="bm-badge" style="background: #166534; color: white; font-size: 11px;">Default</span>
+                    {% endif %}
+                </div>
+                <p style="font-weight: 600;">{{ addr.name }}</p>
+                <p style="font-size: 14px; color: var(--bm-text-muted);">{{ addr.address_line }}</p>
+                <p style="font-size: 14px; color: var(--bm-text-muted);">{{ addr.city }}, {{ addr.state }} - {{ addr.pincode }}</p>
+                <p style="font-size: 14px; color: var(--bm-text-muted);">Phone: {{ addr.phone }}</p>
+            </div>
+            <form method="POST" action="{{ url_for('delete_address', addr_id=addr.id) }}" style="flex-shrink: 0;">
+                <button type="submit" style="background: none; border: none; color: #991b1b; cursor: pointer; font-weight: 700; font-size: 14px;">&#10005; Delete</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bm-glass-panel" style="text-align: center; padding: 48px 32px;">
+        <p style="color: var(--bm-text-muted);">No saved addresses yet. Add one above for faster checkout!</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

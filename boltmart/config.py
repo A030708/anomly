@@ -14,6 +14,9 @@ class Config:
     SENTINEL_URL = os.getenv("SENTINEL_URL", "http://127.0.0.1:5003/api/ingest")
     SENTINEL_SHARED_SECRET = os.getenv("SENTINEL_SHARED_SECRET", "sentinel-secure-key-123")
 
+    RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+    RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+
     DELIVERY_FEE = 99
     FREE_DELIVERY_THRESHOLD = 2000
 
@@ -24,6 +27,7 @@ class Config:
     SMTP_USER = os.getenv("SMTP_USER", "")
     SMTP_PASS = os.getenv("SMTP_PASS", "")
     SMTP_FROM = os.getenv("SMTP_FROM", "noreply@boltmart.in")
+    ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
 
     COMPANY_NAME = "BoltMart"
     COMPANY_ADDRESS = "BoltMart Logistics, Mumbai - 400001, India"

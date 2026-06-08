@@ -26,7 +26,10 @@
         <button type="submit" class="bm-btn bm-btn-primary" style="width: 100%;">Login</button>
     </form>
     
-    <div style="margin-top: 20px; text-align: center;">
+    <div style="margin-top: 12px; text-align: center;">
+        <a href="{{ url_for('forgot_password') }}" style="color:var(--bm-text-muted); font-size: 14px; text-decoration:none;">Forgot Password?</a>
+    </div>
+    <div style="margin-top: 8px; text-align: center;">
         <a href="{{ url_for('register') }}" style="color:var(--bm-accent); text-decoration:none;">Don't have an account? Register here</a>
     </div>
 </div>

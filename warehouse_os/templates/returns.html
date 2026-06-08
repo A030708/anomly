@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Returns - WarehouseOS{% endblock %}
+{% block header_title %}Return Requests{% endblock %}
+{% block content %}
+
+<h1 class="wos-page-title" style="margin-bottom: 8px;">Return &amp; Replace Requests</h1>
+<p style="color: var(--wos-text-muted); margin-bottom: 24px;">Review and process customer return/replace requests.</p>
+
+{% if returns %}
+<div class="wos-card wos-table-wrapper">
+    <div style="padding: 16px 20px; border-bottom: 1px solid var(--wos-border); font-weight: 700;">
+        All Requests ({{ returns|length }})
+    </div>
+    <table class="wos-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Type</th>
+                <th>Items</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in returns %}
+            <tr>
+                <td style="font-weight: 700;">#{{ r.id }}</td>
+                <td style="font-family: monospace; font-size: 13px;">{{ r.order_id[:20] }}...</td>
+                <td style="font-size: 13px;">{{ r.email[:20] }}</td>
+                <td>
+                    <span class="wos-badge {% if r.type == 'return' %}wos-badge-warning{% else %}wos-badge-info{% endif %}">
+                        {{ r.type|upper }}
+                    </span>
+                </td>
+                <td style="font-size: 13px;">
+                    {% for item in r.get('items', []) %}
+                        <div>{{ item.name }} &times; {{ item.quantity }}</div>
+                    {% endfor %}
+                </td>
+                <td style="font-size: 13px; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.reason }}</td>
+                <td>
+                    <span class="wos-badge
+                        {% if r.status == 'pending' %}wos-badge-warning
+                        {% elif r.status == 'approved' %}wos-badge-success
+                        {% elif r.status == 'rejected' %}wos-badge-danger
+                        {% elif r.status == 'refunded' %}wos-badge-info
+                        {% endif %}">
+                        {{ r.status|upper }}
+                    </span>
+                </td>
+                <td style="font-size: 13px;">{{ r.created_at[:10] if r.created_at else '-' }}</td>
+                <td>
+                    {% if r.status == 'pending' %}
+                    <form method="POST" action="{{ url_for('return_update_status', rid=r.id) }}" style="display: flex; gap: 4px; flex-wrap: nowrap;">
+                        <input type="hidden" name="status" value="approved">
+                        <input type="text" name="admin_note" placeholder="Note" style="width: 80px; font-size: 11px; padding: 4px; border: 1px solid var(--wos-border); border-radius: 4px;">
+                        <button type="submit" class="wos-btn wos-btn-success" style="padding: 4px 8px; font-size: 11px;">Approve</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('return_update_status', rid=r.id) }}" style="display: flex; gap: 4px; margin-top: 4px;">
+                        <input type="hidden" name="status" value="rejected">
+                        <input type="text" name="admin_note" placeholder="Reason" style="width: 80px; font-size: 11px; padding: 4px; border: 1px solid var(--wos-border); border-radius: 4px;">
+                        <button type="submit" class="wos-btn wos-btn-danger" style="padding: 4px 8px; font-size: 11px;">Reject</button>
+                    </form>
+                    {% elif r.status == 'approved' %}
+                    <form method="POST" action="{{ url_for('return_update_status', rid=r.id) }}" style="display: flex; gap: 4px;">
+                        <input type="hidden" name="status" value="refunded">
+                        <input type="hidden" name="admin_note" value="{{ r.admin_note or '' }}">
+                        <button type="submit" class="wos-btn wos-btn-primary" style="padding: 4px 8px; font-size: 11px;">Mark Refunded</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="wos-card" style="padding: 48px; text-align: center; color: var(--wos-text-muted);">
+    <p>No return requests yet.</p>
+</div>
+{% endif %}
+
+{% endblock %}

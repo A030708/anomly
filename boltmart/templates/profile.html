@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}My Profile - BoltMart{% endblock %}
+{% block content %}
+
+<div class="bm-container" style="max-width: 800px; margin: 40px auto;">
+    <h1 class="bm-page-title" style="margin-bottom: 32px;">My Profile</h1>
+
+    {% if message %}
+    <div class="bm-alert bm-alert-info" style="margin-bottom: 24px;">
+        <i class="fas fa-info-circle"></i> {{ message }}
+    </div>
+    {% endif %}
+
+    <div class="bm-grid" style="grid-template-columns: 1fr 1fr; align-items: start;">
+        
+        <div class="bm-card">
+            <h2 style="font-size: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--bm-border); padding-bottom: 12px;">Personal Details</h2>
+            <form method="POST" action="{{ url_for('profile') }}">
+                <input type="hidden" name="action" value="update_profile">
+                
+                <div class="bm-form-group">
+                    <label class="bm-label">Email</label>
+                    <input type="email" value="{{ customer.email }}" class="bm-input" disabled style="background: var(--bm-background);">
+                </div>
+
+                <div class="bm-form-group">
+                    <label class="bm-label">Full Name</label>
+                    <input type="text" name="name" value="{{ customer.name }}" class="bm-input" required>
+                </div>
+                
+                <div class="bm-form-group">
+                    <label class="bm-label">Phone Number</label>
+                    <input type="tel" name="phone" value="{{ customer.phone }}" class="bm-input" required>
+                </div>
+                
+                <button type="submit" class="bm-btn bm-btn-primary" style="width: 100%;">Save Changes</button>
+            </form>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+            <div class="bm-card" style="background: #1e293b; color: white; border: none;">
+                <h2 style="font-size: 18px; margin-bottom: 8px;">Order Statistics</h2>
+                <div style="font-size: 36px; font-weight: 800;">{{ order_count }}</div>
+                <div style="font-size: 14px; opacity: 0.9;">Total orders placed</div>
+                <div style="margin-top: 16px;">
+                    <a href="{{ url_for('my_orders') }}" style="color: white; font-weight: 600; text-decoration: underline;">View Order History &rarr;</a>
+                </div>
+            </div>
+
+            <div class="bm-card">
+                <h2 style="font-size: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--bm-border); padding-bottom: 12px;">Saved Addresses</h2>
+                <p style="color: var(--bm-text-muted); font-size: 14px; margin-bottom: 16px;">Manage your delivery addresses for faster checkout.</p>
+                <a href="{{ url_for('manage_addresses') }}" class="bm-btn bm-btn-secondary" style="width: 100%; text-align: center;">
+                    <i class="fas fa-map-marker-alt"></i> Manage Addresses
+                </a>
+            </div>
+
+            <div class="bm-card">
+                <h2 style="font-size: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--bm-border); padding-bottom: 12px;">Change Password</h2>
+                <form method="POST" action="{{ url_for('profile') }}">
+                    <input type="hidden" name="action" value="change_password">
+                    
+                    <div class="bm-form-group">
+                        <label class="bm-label">Current Password</label>
+                        <input type="password" name="current_password" class="bm-input" required>
+                    </div>
+                    
+                    <div class="bm-form-group">
+                        <label class="bm-label">New Password</label>
+                        <input type="password" name="new_password" class="bm-input" required>
+                    </div>
+
+                    <div class="bm-form-group">
+                        <label class="bm-label">Confirm New Password</label>
+                        <input type="password" name="confirm_password" class="bm-input" required>
+                    </div>
+                    
+                    <button type="submit" class="bm-btn bm-btn-secondary" style="width: 100%;">Update Password</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

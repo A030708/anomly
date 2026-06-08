@@ -1,5 +1,5 @@
 import requests
-from boltmart.mock_db import record_payment_failure, reset_payment_failures
+from boltmart.db_users import record_payment_failure, reset_payment_failures
 from boltmart.config import Config
 from boltmart.notifier import send_fraud_alert, send_user_suspended
 

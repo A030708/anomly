@@ -7,35 +7,75 @@
     <span style="color: var(--bm-text-muted); font-weight: 500;">{{ products|length }} items found</span>
 </div>
 
-<div style="display: flex; gap: 12px; margin-bottom: 32px; overflow-x: auto; padding-bottom: 8px;">
-    <a href="{{ url_for('shop') }}"
-       class="bm-badge {% if not selected %}bm-btn-primary{% else %}bm-btn-secondary{% endif %}" style="padding: 8px 16px; font-size: 14px;">
-        All
-    </a>
-    {% for cat in categories %}
-        <a href="{{ url_for('shop', category=cat) }}"
-           class="bm-badge {% if cat == selected %}bm-btn-primary{% else %}bm-btn-secondary{% endif %}" style="padding: 8px 16px; font-size: 14px;">
-            {{ cat }}
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; flex-wrap: wrap; gap: 20px;">
+    <!-- Category Filters -->
+    <div style="display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; flex: 1; min-width: 300px;">
+        <a href="{{ url_for('shop') }}"
+           class="bm-badge {% if not selected %}bm-btn-primary{% else %}bm-btn-secondary{% endif %}" style="padding: 8px 16px; font-size: 14px;">
+            All
         </a>
-    {% endfor %}
+        {% for cat in categories %}
+            <a href="{{ url_for('shop', category=cat) }}"
+               class="bm-badge {% if cat == selected %}bm-btn-primary{% else %}bm-btn-secondary{% endif %}" style="padding: 8px 16px; font-size: 14px;">
+                {{ cat }}
+            </a>
+        {% endfor %}
+    </div>
+
+    <!-- Price Filter -->
+    <form action="{{ url_for('shop') }}" method="GET" style="display: flex; align-items: center; gap: 8px; background: var(--bm-surface); padding: 12px; border-radius: var(--bm-radius-md); border: 1px solid var(--bm-border);">
+        <input type="hidden" name="category" value="{{ selected if selected else '' }}">
+        <input type="hidden" name="q" value="{{ search_query if search_query else '' }}">
+        <div style="display: flex; align-items: center; gap: 4px;">
+            <label style="font-size: 13px; color: var(--bm-text-muted);">Min &#8377;</label>
+            <input type="number" name="min_price" value="{{ min_price if min_price else '' }}" class="bm-input" style="width: 80px; padding: 4px 8px; height: 32px;" placeholder="0">
+        </div>
+        <span style="color: var(--bm-text-muted);">-</span>
+        <div style="display: flex; align-items: center; gap: 4px;">
+            <label style="font-size: 13px; color: var(--bm-text-muted);">Max &#8377;</label>
+            <input type="number" name="max_price" value="{{ max_price if max_price else '' }}" class="bm-input" style="width: 80px; padding: 4px 8px; height: 32px;" placeholder="Any">
+        </div>
+        <button type="submit" class="bm-btn bm-btn-secondary" style="padding: 4px 12px; height: 32px; font-size: 13px;">Filter</button>
+    </form>
 </div>
 
 <div class="bm-grid">
     {% for product in products %}
     <div class="bm-card">
-        <div class="bm-image-placeholder" style="margin: -24px -24px 20px -24px; border-bottom-left-radius: 0; border-bottom-right-radius: 0;">
-            &#128295;
+        <div style="margin: -24px -24px 20px -24px; height: 200px; overflow: hidden; background: #f1f5f9; display: flex; align-items: center; justify-content: center;">
+            {% if product.image_url %}
+            <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+            {% else %}
+            <div style="font-size: 48px;">&#128295;</div>
+            {% endif %}
         </div>
         <div style="display: flex; flex-direction: column; flex-grow: 1;">
             <span style="font-size: 12px; font-weight: 700; color: var(--bm-primary); text-transform: uppercase; letter-spacing: 0.5px;">{{ product.category }}</span>
             <h3 class="bm-card-title" style="margin-top: 4px; margin-bottom: 8px; line-height: 1.2;">{{ product.name }}</h3>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto; margin-bottom: 8px;">
                 <span class="bm-card-price" style="margin: 0;">&#8377;{{ "%.0f"|format(product.price) }}</span>
                 <span class="bm-badge {% if product.stock_count <= product.reorder_level %}bm-badge-out{% else %}bm-badge-stock{% endif %}">
                     Stock: {{ product.stock_count }}
                 </span>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="margin-bottom: 12px; font-size: 13px;">
+                {% set rating = product_ratings.get(product.sku) %}
+                {% if rating %}
+                <span style="color: #f59e0b;">
+                    {% for i in range(rating|int) %}&#9733;{% endfor %}{% for i in range(5 - rating|int) %}&#9734;{% endfor %}
+                </span>
+                <span style="color: var(--bm-text-muted); margin-left: 4px;">{{ rating }}</span>
+                {% else %}
+                <span style="color: var(--bm-text-muted);">No reviews</span>
+                {% endif %}
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <form method="POST" action="{{ url_for('add_to_wishlist', sku=product.sku) }}" style="flex-shrink: 0;">
+                    <button type="submit" style="background: none; border: 1px solid var(--bm-border); border-radius: 50%; width: 38px; height: 38px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; color: #e53e3e; transition: 0.2s;" title="Add to Wishlist"
+                            onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background=''">
+                        &#9825;
+                    </button>
+                </form>
                 <a href="{{ url_for('product_detail', sku=product.sku) }}"
                    class="bm-btn bm-btn-secondary" style="flex: 1; padding: 10px;">
                     View

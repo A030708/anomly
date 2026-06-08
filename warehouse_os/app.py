@@ -673,6 +673,39 @@ def create_app():
         except Exception:
             pass
 
+    # ---------------- RETURN MANAGEMENT ----------------
+
+    @app.route("/returns")
+    @login_required
+    @role_required("admin", "manager")
+    @sentinel_monitor
+    def returns_list():
+        g.event_type = "RETURNS_LIST_VIEW"
+        try:
+            resp = get_db().table("return_requests").select("*").order("created_at", desc=True).execute()
+            returns = resp.data or []
+            for r in returns:
+                if isinstance(r.get("items"), str):
+                    r["items"] = json.loads(r["items"])
+        except Exception:
+            returns = []
+        return render_template("returns.html", returns=returns)
+
+    @app.route("/returns/<int:rid>/status", methods=["POST"])
+    @login_required
+    @role_required("admin", "manager")
+    @sentinel_monitor
+    def return_update_status(rid):
+        g.event_type = "RETURN_STATUS_UPDATE"
+        status = request.form.get("status")
+        note = request.form.get("admin_note", "")
+        try:
+            get_db().table("return_requests").update({"status": status, "admin_note": note, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", rid).execute()
+            flash(f"Return request #{rid} updated to '{status}'.")
+        except Exception:
+            flash("Failed to update return request.")
+        return redirect(url_for("returns_list"))
+
     # ---------------- PRODUCT CRUD ----------------
 
     @app.route("/products/new", methods=["GET", "POST"])
@@ -1036,6 +1069,60 @@ def create_app():
             flash(f"Category '{name}' removed.")
 
         return redirect(url_for("admin_categories"))
+
+    # ---------------- COUPON MANAGEMENT ----------------
+
+    @app.route("/admin/coupons", methods=["GET", "POST"])
+    @login_required
+    @role_required("admin")
+    @sentinel_monitor
+    def admin_coupons():
+        g.event_type = "ADMIN_COUPONS_VIEW"
+
+        if request.method == "POST":
+            code = request.form.get("code", "").strip().upper()
+            discount_type = request.form.get("discount_type")
+            discount_value = float(request.form.get("discount_value", 0))
+            min_order_value = float(request.form.get("min_order_value", 0))
+            max_uses = int(request.form.get("max_uses", 100))
+
+            if code and discount_value > 0:
+                existing = get_db().table("coupons").select("code").eq("code", code).execute()
+                if not existing.data:
+                    get_db().table("coupons").insert({
+                        "code": code,
+                        "discount_type": discount_type,
+                        "discount_value": discount_value,
+                        "min_order_value": min_order_value,
+                        "max_uses": max_uses,
+                        "is_active": True,
+                    }).execute()
+                    audit("COUPON_CREATED", "coupons", code, {"type": discount_type, "value": discount_value})
+                    flash(f"Coupon '{code}' created.")
+                else:
+                    flash(f"Coupon '{code}' already exists.")
+            return redirect(url_for("admin_coupons"))
+
+        try:
+            resp = get_db().table("coupons").select("*").order("created_at", desc=True).execute()
+            coupons = resp.data or []
+        except Exception:
+            coupons = []
+        return render_template("coupons.html", coupons=coupons)
+
+    @app.route("/admin/coupons/<code>/delete", methods=["POST"])
+    @login_required
+    @role_required("admin")
+    @sentinel_monitor
+    def coupon_delete(code):
+        g.event_type = "COUPON_DELETE"
+        try:
+            get_db().table("coupons").delete().eq("code", code).execute()
+            audit("COUPON_DELETED", "coupons", code)
+            flash(f"Coupon '{code}' deleted.")
+        except Exception:
+            flash("Failed to delete coupon.")
+        return redirect(url_for("admin_coupons"))
 
     # ---------------- USER CRUD ----------------
 

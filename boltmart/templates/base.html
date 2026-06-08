@@ -13,25 +13,90 @@
     <div class="bm-container">
         <div class="bm-nav-content">
             <a href="{{ url_for('home') }}" class="bm-brand">
-                <i class="fas fa-bolt" style="color:var(--bm-secondary)"></i> BOLTMART
+                <i class="fas fa-bolt"></i> BOLTMART
             </a>
-            <div class="bm-nav-links">
-                <a href="{{ url_for('home') }}" class="bm-nav-link">Home</a>
-                <a href="{{ url_for('shop') }}" class="bm-nav-link">Shop</a>
-                <a href="{{ url_for('view_cart') }}" class="bm-nav-link">
-                    <i class="fas fa-shopping-cart"></i> Cart
+
+            <form action="{{ url_for('shop') }}" method="GET" class="bm-nav-search">
+                <input type="text" name="q" placeholder="Search products..." value="{{ search_query|default('') }}" class="bm-input">
+                <button type="submit" class="bm-btn bm-btn-primary"><i class="fas fa-search"></i></button>
+            </form>
+
+            <div class="bm-nav-actions">
+                <a href="{{ url_for('shop') }}" class="bm-nav-icon bm-nav-link"><i class="fas fa-store"></i> <span>Shop</span></a>
+
+                <a href="{{ url_for('view_wishlist') }}" class="bm-nav-icon">
+                    <i class="fas fa-heart"></i> <span>Wishlist</span>
+                    {% if session.get('wishlist') %}
+                        <span class="bm-cart-badge">{{ session.get('wishlist')|length }}</span>
+                    {% endif %}
+                </a>
+
+                <a href="{{ url_for('view_cart') }}" class="bm-nav-icon">
+                    <i class="fas fa-shopping-cart"></i> <span>Cart</span>
                     {% if session.get('cart') %}
                         <span class="bm-cart-badge">{{ session.get('cart')|length }}</span>
                     {% endif %}
                 </a>
-                <a href="{{ url_for('track_search') }}" class="bm-nav-link">Track Order</a>
+
                 {% if g.customer %}
-                    <a href="{{ url_for('logout') }}" class="bm-nav-link">Logout ({{ g.customer.name }})</a>
+                <div class="bm-nav-user" id="userMenu">
+                    <button class="bm-nav-user-btn" onclick="toggleUserMenu()">
+                        <span class="bm-avatar">{{ g.customer.name[0]|upper }}</span>
+                        <span>{{ g.customer.name.split(' ')[0] }}</span>
+                        <i class="fas fa-chevron-down" style="font-size: 11px; color: var(--bm-muted);"></i>
+                    </button>
+                    <div class="bm-nav-dropdown" id="userDropdown">
+                        <a href="{{ url_for('my_orders') }}"><i class="fas fa-box"></i> My Orders</a>
+                        <a href="{{ url_for('my_returns') }}"><i class="fas fa-undo"></i> Returns</a>
+                        <a href="{{ url_for('manage_addresses') }}"><i class="fas fa-map-marker-alt"></i> Addresses</a>
+                        <a href="{{ url_for('notifications') }}">
+                            <i class="fas fa-bell"></i> Notifications
+                            {% if g.unread_count > 0 %}
+                            <span class="bm-cart-badge" style="margin-left: auto;">{{ g.unread_count }}</span>
+                            {% endif %}
+                        </a>
+                        <a href="{{ url_for('profile') }}"><i class="fas fa-user"></i> Profile</a>
+                        <div class="bm-dropdown-divider"></div>
+                        <a href="{{ url_for('logout') }}" class="bm-dropdown-danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
+                </div>
                 {% else %}
-                    <a href="{{ url_for('login') }}" class="bm-nav-link">Login</a>
+                <a href="{{ url_for('track_search') }}" class="bm-nav-icon bm-nav-link"><i class="fas fa-map-marker-alt"></i> <span>Track</span></a>
+                <a href="{{ url_for('login') }}" class="bm-btn bm-btn-primary" style="height: 36px; padding: 0 16px; font-size: 13px; margin-left: 4px;">Login</a>
                 {% endif %}
+
+                <button class="bm-nav-toggle" onclick="toggleMobileMenu()" aria-label="Menu">
+                    <i class="fas fa-bars"></i>
+                </button>
             </div>
         </div>
+    </div>
+
+    <div class="bm-nav-mobile" id="mobileMenu">
+        <form action="{{ url_for('shop') }}" method="GET" class="bm-mobile-search">
+            <input type="text" name="q" placeholder="Search products..." value="{{ search_query|default('') }}" class="bm-input">
+            <button type="submit" class="bm-btn bm-btn-primary"><i class="fas fa-search"></i></button>
+        </form>
+
+        <a href="{{ url_for('home') }}"><i class="fas fa-home"></i> Home</a>
+        <a href="{{ url_for('shop') }}"><i class="fas fa-store"></i> Shop</a>
+        <a href="{{ url_for('view_wishlist') }}"><i class="fas fa-heart"></i> Wishlist</a>
+        <a href="{{ url_for('view_cart') }}"><i class="fas fa-shopping-cart"></i> Cart</a>
+
+        {% if g.customer %}
+        <div style="height: 1px; background: var(--bm-hairline); margin: 8px 0;"></div>
+        <a href="{{ url_for('my_orders') }}"><i class="fas fa-box"></i> My Orders</a>
+        <a href="{{ url_for('my_returns') }}"><i class="fas fa-undo"></i> Returns</a>
+        <a href="{{ url_for('manage_addresses') }}"><i class="fas fa-map-marker-alt"></i> Addresses</a>
+        <a href="{{ url_for('notifications') }}"><i class="fas fa-bell"></i> Notifications</a>
+        <a href="{{ url_for('profile') }}"><i class="fas fa-user"></i> Profile</a>
+        <div style="height: 1px; background: var(--bm-hairline); margin: 8px 0;"></div>
+        <a href="{{ url_for('logout') }}" style="color: var(--bm-error);"><i class="fas fa-sign-out-alt"></i> Logout ({{ g.customer.name }})</a>
+        {% else %}
+        <div style="height: 1px; background: var(--bm-hairline); margin: 8px 0;"></div>
+        <a href="{{ url_for('track_search') }}"><i class="fas fa-map-marker-alt"></i> Track Order</a>
+        <a href="{{ url_for('login') }}"><i class="fas fa-sign-in-alt"></i> Login</a>
+        {% endif %}
     </div>
 </nav>
 
@@ -58,5 +123,27 @@
     </div>
 </footer>
 
+<script>
+function toggleUserMenu() {
+    document.getElementById('userDropdown').classList.toggle('open');
+}
+
+function toggleMobileMenu() {
+    document.getElementById('mobileMenu').classList.toggle('open');
+}
+
+document.addEventListener('click', function(e) {
+    var userMenu = document.getElementById('userMenu');
+    if (userMenu && !userMenu.contains(e.target)) {
+        var dd = document.getElementById('userDropdown');
+        if (dd) dd.classList.remove('open');
+    }
+    var mobile = document.getElementById('mobileMenu');
+    var toggle = document.querySelector('.bm-nav-toggle');
+    if (mobile && mobile.classList.contains('open') && toggle && !toggle.contains(e.target) && !mobile.contains(e.target)) {
+        mobile.classList.remove('open');
+    }
+});
+</script>
 </body>
 </html>

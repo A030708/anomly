@@ -28,6 +28,31 @@
     </div>
 </div>
 
+{% if recently_viewed %}
+<div style="margin-top: 48px;">
+    <h2 class="bm-page-title" style="font-size: 24px; margin-bottom: 20px;">&#128337; Recently Viewed</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px;">
+        {% for item in recently_viewed %}
+        <a href="{{ url_for('product_detail', sku=item.sku) }}" style="text-decoration: none; color: inherit;">
+            <div class="bm-card" style="padding: 0; overflow: hidden; height: 100%;">
+                <div style="height: 140px; background: #f1f5f9; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                    {% if item.image_url %}
+                    <img src="{{ item.image_url }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                    {% else %}
+                    <span style="font-size: 32px;">&#128295;</span>
+                    {% endif %}
+                </div>
+                <div style="padding: 12px; text-align: center;">
+                    <p style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">{{ item.name }}</p>
+                    <p style="font-weight: 800; color: #166534; margin: 0;">&#8377;{{ "%.0f"|format(item.price) }}</p>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 {% if show_track_search %}
 <div class="bm-glass-panel" style="max-width: 500px; margin: 48px auto 0 auto;">
     <h2 class="bm-page-title" style="font-size:24px;">Track Your Order</h2>

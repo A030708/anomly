@@ -52,6 +52,9 @@
             
             {% if current_user.role in ['admin', 'manager'] %}
             <div class="wos-nav-section">Reports</div>
+            <a href="{{ url_for('returns_list') }}" class="wos-nav-link {% if request.endpoint == 'returns_list' %}active{% endif %}">
+                <i class="fa-solid fa-rotate-left"></i> Returns
+            </a>
             <a href="{{ url_for('export_page') }}" class="wos-nav-link {% if request.endpoint == 'export_page' %}active{% endif %}">
                 <i class="fa-solid fa-file-export"></i> Export
             </a>
@@ -77,6 +80,9 @@
             </a>
             <a href="{{ url_for('admin_categories') }}" class="wos-nav-link {% if request.endpoint == 'admin_categories' %}active{% endif %}">
                 <i class="fa-solid fa-tags"></i> Categories
+            </a>
+            <a href="{{ url_for('admin_coupons') }}" class="wos-nav-link {% if request.endpoint == 'admin_coupons' %}active{% endif %}">
+                <i class="fa-solid fa-ticket"></i> Coupons
             </a>
             {% endif %}
         </nav>

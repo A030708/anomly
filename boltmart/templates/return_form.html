@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Return / Replace - BoltMart{% endblock %}
+{% block content %}
+
+<div style="max-width: 700px; margin: 40px auto;">
+    <h1 class="bm-page-title" style="margin-bottom: 8px;">Request Return / Replace</h1>
+    <p style="color: var(--bm-text-muted); margin-bottom: 32px;">Order: <strong>{{ order.order_id }}</strong></p>
+
+    {% if error %}
+    <div class="bm-alert" style="background:#fff5f5; color:#e53e3e; border-left:4px solid #e53e3e; padding:12px; margin-bottom:20px;">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" class="bm-card" style="padding: 32px;">
+        <div class="bm-form-group" style="margin-bottom: 24px;">
+            <label class="bm-label">Request Type</label>
+            <div style="display: flex; gap: 16px; margin-top: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; padding: 16px 20px; border: 2px solid var(--bm-border); border-radius: var(--bm-radius-md); cursor: pointer; flex: 1;">
+                    <input type="radio" name="type" value="return" checked style="width: 18px; height: 18px;">
+                    <div>
+                        <strong>Return</strong>
+                        <p style="font-size: 13px; color: var(--bm-text-muted); margin: 0;">Full refund after pickup</p>
+                    </div>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; padding: 16px 20px; border: 2px solid var(--bm-border); border-radius: var(--bm-radius-md); cursor: pointer; flex: 1;">
+                    <input type="radio" name="type" value="replace" style="width: 18px; height: 18px;">
+                    <div>
+                        <strong>Replace</strong>
+                        <p style="font-size: 13px; color: var(--bm-text-muted); margin: 0;">Exchange with new item</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <div class="bm-form-group" style="margin-bottom: 24px;">
+            <label class="bm-label">Select Items</label>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                {% for item in order.items %}
+                <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--bm-border); border-radius: var(--bm-radius-sm); cursor: pointer;">
+                    <input type="checkbox" name="items" value="{{ item.sku }}" style="width: 18px; height: 18px;">
+                    <span style="flex: 1; font-size: 14px;">{{ item.name }} &times; {{ item.quantity }}</span>
+                    <span style="font-weight: 600; font-size: 14px;">&#8377;{{ "%.0f"|format(item.line_total) }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bm-form-group" style="margin-bottom: 24px;">
+            <label class="bm-label">Reason</label>
+            <select name="reason" class="bm-input" required>
+                <option value="">Select a reason...</option>
+                <option value="Defective / not working">Defective / not working</option>
+                <option value="Wrong item delivered">Wrong item delivered</option>
+                <option value="Damaged in transit">Damaged in transit</option>
+                <option value="Size / fit issue">Size / fit issue</option>
+                <option value="Quality not as expected">Quality not as expected</option>
+                <option value="Changed mind / no longer needed">Changed mind / no longer needed</option>
+            </select>
+        </div>
+
+        <button type="submit" class="bm-btn bm-btn-primary" style="width: 100%; padding: 14px; font-size: 16px;">
+            Submit Request
+        </button>
+    </form>
+</div>
+
+{% endblock %}

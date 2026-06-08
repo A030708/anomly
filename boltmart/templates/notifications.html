@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Notifications - BoltMart{% endblock %}
+{% block content %}
+
+<div style="max-width: 800px; margin: 40px auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+        <h1 class="bm-page-title" style="margin-bottom: 0;">Notifications</h1>
+        {% if notifications %}
+        <form method="POST" action="{{ url_for('mark_notifications_read') }}" style="margin: 0;">
+            <button type="submit" class="bm-btn bm-btn-secondary" style="padding: 8px 16px; font-size: 13px;">
+                <i class="fas fa-check-double"></i> Mark All Read
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if notifications %}
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+        {% for n in notifications %}
+        <div style="background: var(--bm-surface); padding: 16px 20px; border-radius: var(--bm-radius-md); border: 1px solid var(--bm-border); display: flex; align-items: start; gap: 16px; {% if not n.is_read %}border-left: 4px solid var(--bm-primary); background: #f8faff;{% endif %}">
+            <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px;
+                {% if n.type == 'order' %}background: #dbeafe; color: #1e40af;
+                {% elif n.type == 'offer' %}background: #fef3c7; color: #92400e;
+                {% elif n.type == 'alert' %}background: #fee2e2; color: #991b1b;
+                {% else %}background: #f3f4f6; color: #6b7280;{% endif %}">
+                {% if n.type == 'order' %}<i class="fas fa-box"></i>
+                {% elif n.type == 'offer' %}<i class="fas fa-tag"></i>
+                {% elif n.type == 'alert' %}<i class="fas fa-exclamation"></i>
+                {% else %}<i class="fas fa-info"></i>{% endif %}
+            </div>
+            <div style="flex-grow: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                    <strong style="font-size: 15px;">{{ n.title }}</strong>
+                    <span style="font-size: 12px; color: var(--bm-text-muted); white-space: nowrap;">{{ n.created_at[:10] }}</span>
+                </div>
+                <p style="font-size: 14px; color: var(--bm-text-muted); margin-top: 4px;">{{ n.message }}</p>
+                {% if n.link %}
+                <a href="{{ n.link }}" class="bm-nav-link" style="font-size: 13px; font-weight: 600; margin-top: 4px; display: inline-block;">View Details &rarr;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bm-glass-panel" style="text-align: center; padding: 64px 32px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">&#128276;</div>
+        <h2 style="font-size: 24px; margin-bottom: 8px;">No notifications</h2>
+        <p style="color: var(--bm-text-muted);">You're all caught up! Notifications about your orders will appear here.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

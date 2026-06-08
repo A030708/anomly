@@ -21,16 +21,16 @@ def generate_invoice(order) -> bytes:
     )
 
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle("CompanyName", parent=styles["Heading1"], fontSize=22,
-               textColor=HexColor("#1a56db"), spaceAfter=4))
-    styles.add(ParagraphStyle("CompanyDetail", parent=styles["Normal"], fontSize=8,
+    styles.add(ParagraphStyle("CompanyName", parent=styles["Heading1"], fontSize=24,
+               textColor=HexColor("#1a1a1a"), spaceAfter=2))
+    styles.add(ParagraphStyle("CompanyTag", parent=styles["Normal"], fontSize=9,
                textColor=HexColor("#6b7280"), spaceAfter=2))
-    styles.add(ParagraphStyle("InvoiceTitle", parent=styles["Heading2"], fontSize=16,
-               textColor=HexColor("#111827"), spaceAfter=4))
+    styles.add(ParagraphStyle("InvTitle", parent=styles["Heading2"], fontSize=13,
+               textColor=HexColor("#6b7280"), spaceAfter=4))
     styles.add(ParagraphStyle("Label", parent=styles["Normal"], fontSize=9,
                textColor=HexColor("#6b7280")))
     styles.add(ParagraphStyle("Value", parent=styles["Normal"], fontSize=10,
-               textColor=HexColor("#111827")))
+               textColor=HexColor("#1a1a1a")))
     styles.add(ParagraphStyle("TableHeader", parent=styles["Normal"], fontSize=9,
                textColor=HexColor("#ffffff")))
     styles.add(ParagraphStyle("TableCell", parent=styles["Normal"], fontSize=9,
@@ -43,123 +43,134 @@ def generate_invoice(order) -> bytes:
         import json
         items = json.loads(items)
 
+    subtotal = sum(i.get("line_total", 0) for i in items)
+    total_val = order.get("total_value", subtotal)
+    delivery_fee = 0 if subtotal >= Config.FREE_DELIVERY_THRESHOLD else Config.DELIVERY_FEE
+
     elements = []
 
     elements.append(Paragraph("BoltMart", styles["CompanyName"]))
-    elements.append(Paragraph("Industrial & Safety Equipment Supply", styles["CompanyDetail"]))
+    elements.append(Paragraph("Industrial &amp; Safety Equipment Supply", styles["CompanyTag"]))
     elements.append(HRFlowable(width="100%", thickness=1, color=HexColor("#e5e7eb")))
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 16))
 
-    elements.append(Paragraph("TAX INVOICE", styles["InvoiceTitle"]))
-    elements.append(Spacer(1, 8))
+    elements.append(Paragraph("ORDER INVOICE", styles["InvTitle"]))
+    elements.append(Spacer(1, 6))
 
-    invoice_data = [
-        [Paragraph("Invoice #", styles["Label"]), Paragraph(f"INV-{order.get('order_id', 'N/A')[:16]}", styles["Value"])],
+    info_rows = [
         [Paragraph("Order ID", styles["Label"]), Paragraph(str(order.get("order_id", "N/A")), styles["Value"])],
-        [Paragraph("Transaction ID", styles["Label"]), Paragraph(str(order.get("transaction_id") or "N/A"), styles["Value"])],
-        [Paragraph("Payment Method", styles["Label"]), Paragraph(str(order.get("payment_method", "N/A")).upper(), styles["Value"])],
-        [Paragraph("Payment Status", styles["Label"]), Paragraph(str(order.get("payment_status", "N/A")).upper(), styles["Value"])],
         [Paragraph("Invoice Date", styles["Label"]), Paragraph(datetime.now().strftime("%d %b %Y, %I:%M %p"), styles["Value"])],
+        [Paragraph("Payment", styles["Label"]), Paragraph(str(order.get("payment_method", "N/A")).upper(), styles["Value"])],
+        [Paragraph("Status", styles["Label"]), Paragraph(str(order.get("payment_status", "N/A")).upper(), styles["Value"])],
     ]
-    t = Table(invoice_data, colWidths=[110, 280])
-    t.setStyle(TableStyle([
+    if order.get("razorpay_payment_id") or order.get("transaction_id"):
+        info_rows.insert(2, [
+            Paragraph("Transaction ID", styles["Label"]),
+            Paragraph(str(order.get("razorpay_payment_id") or order.get("transaction_id")), styles["Value"])
+        ])
+    t_info = Table(info_rows, colWidths=[110, 280])
+    t_info.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("TOPPADDING", (0, 0), (-1, -1), 2),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
     ]))
-    elements.append(t)
-    elements.append(Spacer(1, 16))
+    elements.append(t_info)
+    elements.append(Spacer(1, 20))
 
     bill_to = [
-        [Paragraph("<b>Bill To:</b>", styles["Label"])],
+        [Paragraph("<b>BILL TO</b>", ParagraphStyle("BillLabel", parent=styles["Label"], fontSize=10, textColor=HexColor("#1a1a1a")))],
         [Paragraph(str(order.get("customer_name", "N/A")), styles["Value"])],
-        [Paragraph(str(order.get("email", "")), styles["CompanyDetail"])],
-        [Paragraph(str(order.get("phone", "")), styles["CompanyDetail"])],
-        [Paragraph(f"{order.get('address', '')}, {order.get('city', '')} - {order.get('pincode', '')}", styles["CompanyDetail"])],
+        [Paragraph(str(order.get("email", "")), styles["CompanyTag"])],
+        [Paragraph(str(order.get("phone", "")), styles["CompanyTag"])],
+        [Paragraph(f"{order.get('address', '')}, {order.get('city', '')} - {order.get('pincode', '')}", styles["CompanyTag"])],
     ]
-    t2 = Table(bill_to, colWidths=[390])
-    t2.setStyle(TableStyle([
+    t_bill = Table(bill_to, colWidths=[390])
+    t_bill.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("TOPPADDING", (0, 0), (-1, -1), 1),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
     ]))
-    elements.append(t2)
-    elements.append(Spacer(1, 16))
+    elements.append(t_bill)
+    elements.append(Spacer(1, 20))
 
-    header_color = HexColor("#1a56db")
+    header_color = HexColor("#1a1a1a")
     alt_row = HexColor("#f9fafb")
     table_data = [
         [Paragraph("<b>#</b>", styles["TableHeader"]),
-         Paragraph("<b>SKU</b>", styles["TableHeader"]),
          Paragraph("<b>Item</b>", styles["TableHeader"]),
+         Paragraph("<b>SKU</b>", styles["TableHeader"]),
          Paragraph("<b>Qty</b>", styles["TableHeader"]),
-         Paragraph("<b>Unit Price</b>", styles["TableHeader"]),
-         Paragraph("<b>Total</b>", styles["TableHeader"])]
+         Paragraph("<b>Rate</b>", styles["TableHeader"]),
+         Paragraph("<b>Amount</b>", styles["TableHeader"])]
     ]
     for idx, item in enumerate(items, 1):
         table_data.append([
             Paragraph(str(idx), styles["TableCell"]),
-            Paragraph(item.get("sku", ""), styles["TableCell"]),
             Paragraph(item.get("name", ""), styles["TableCell"]),
+            Paragraph(item.get("sku", ""), styles["TableCell"]),
             Paragraph(str(item.get("quantity", 0)), styles["TableCell"]),
             Paragraph(f"\u20b9{item.get('unit_price', 0):,.0f}", styles["TableCell"]),
             Paragraph(f"\u20b9{item.get('line_total', 0):,.0f}", styles["TableCell"]),
         ])
 
-    col_widths = [20, 60, 150, 35, 65, 65]
-    t3 = Table(table_data, colWidths=col_widths, repeatRows=1)
-    t3.setStyle(TableStyle([
+    col_widths = [22, 155, 60, 35, 60, 60]
+    t_items = Table(table_data, colWidths=col_widths, repeatRows=1)
+    t_items.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), header_color),
         ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#ffffff")),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("ALIGN", (2, 1), (2, -1), "LEFT"),
+        ("ALIGN", (1, 1), (1, -1), "LEFT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [None, alt_row]),
         ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#d1d5db")),
-        ("LINEBELOW", (0, 0), (-1, 0), 1, header_color),
     ]))
-    elements.append(t3)
+    elements.append(t_items)
     elements.append(Spacer(1, 12))
 
-    total_val = order.get("total_value", 0)
-    summary_data = [
-        [Paragraph("Subtotal", styles["Label"]), Paragraph(f"\u20b9{total_val:,.0f}", styles["Value"])],
-        [Paragraph("GST (18%)", styles["Label"]), Paragraph(f"\u20b9{total_val * 0.18:,.0f}", styles["Value"])],
-        [Paragraph("Delivery", styles["Label"]), Paragraph("FREE" if total_val >= 2000 else "\u20b999", styles["Value"])],
-    ]
-    t4 = Table(summary_data, colWidths=[320, 70])
-    t4.setStyle(TableStyle([
-        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("LINEABOVE", (0, 0), (-1, 0), 0.5, HexColor("#e5e7eb")),
-    ]))
-    elements.append(t4)
+    summary_data = []
+    if subtotal != total_val:
+        summary_data.append([Paragraph("Subtotal", styles["Label"]), Paragraph(f"\u20b9{subtotal:,.0f}", styles["Value"])])
+    if delivery_fee > 0:
+        summary_data.append([Paragraph("Delivery", styles["Label"]), Paragraph(f"\u20b9{delivery_fee:,.0f}", styles["Value"])])
+    elif subtotal != total_val:
+        summary_data.append([Paragraph("Delivery", styles["Label"]), Paragraph("FREE", ParagraphStyle("FreeDel", parent=styles["Value"], textColor=HexColor("#16a34a")))])
 
-    elements.append(HRFlowable(width="100%", thickness=2, color=HexColor("#1a56db")))
+    if summary_data:
+        t_sum = Table(summary_data, colWidths=[320, 70])
+        t_sum.setStyle(TableStyle([
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LINEABOVE", (0, 0), (-1, 0), 0.5, HexColor("#e5e7eb")),
+        ]))
+        elements.append(t_sum)
+        elements.append(Spacer(1, 4))
+
+    elements.append(HRFlowable(width="100%", thickness=2, color=HexColor("#1a1a1a")))
     total_row = [
-        [Paragraph("<b>Total Amount</b>", ParagraphStyle("TotalLabel", parent=styles["Label"], fontSize=12)),
-         Paragraph(f"<b>\u20b9{total_val:,.0f}</b>", ParagraphStyle("TotalValue", parent=styles["Value"], fontSize=14, alignment=TA_RIGHT))]
+        [Paragraph("<b>Total Amount</b>", ParagraphStyle("TotalLabel", parent=styles["Label"], fontSize=12, textColor=HexColor("#1a1a1a"))),
+         Paragraph(f"<b>\u20b9{total_val:,.0f}</b>", ParagraphStyle("TotalValue", parent=styles["Value"], fontSize=14, alignment=TA_RIGHT, textColor=HexColor("#1a1a1a")))]
     ]
-    t5 = Table(total_row, colWidths=[320, 70])
-    t5.setStyle(TableStyle([
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    t_total = Table(total_row, colWidths=[320, 70])
+    t_total.setStyle(TableStyle([
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
-    elements.append(t5)
+    elements.append(t_total)
 
-    t6 = Table([[Paragraph(f"Amount in words: <b>{number_to_words(int(total_val))} rupees only</b>", styles["CompanyDetail"])]], colWidths=[390])
-    elements.append(t6)
-    elements.append(Spacer(1, 20))
+    words_line = f"Amount in words: <b>{number_to_words(int(total_val))} rupees only</b>"
+    t_words = Table([[Paragraph(words_line, styles["CompanyTag"])]], colWidths=[390])
+    elements.append(t_words)
+    elements.append(Spacer(1, 24))
 
     elements.append(HRFlowable(width="100%", thickness=0.5, color=HexColor("#d1d5db")))
     elements.append(Spacer(1, 6))
     footer_text = (
-        f"{Config.COMPANY_NAME} | {Config.COMPANY_ADDRESS} | GST: {Config.COMPANY_GST}<br/>"
-        "This is a system-generated invoice. For inquiries, contact support@boltmart.in"
+        f"{Config.COMPANY_NAME} &mdash; {Config.COMPANY_ADDRESS}<br/>"
+        f"GST: {Config.COMPANY_GST} &nbsp;|&nbsp; Email: support@boltmart.in"
     )
     elements.append(Paragraph(footer_text, styles["Footer"]))
 

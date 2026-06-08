@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}My Wishlist - BoltMart{% endblock %}
+{% block content %}
+
+<h1 class="bm-page-title" style="margin-bottom: 24px;">My Wishlist</h1>
+
+{% if not wishlist %}
+<div class="bm-glass-panel" style="text-align: center; padding: 64px 32px;">
+    <div style="font-size: 64px; margin-bottom: 16px;">&#10084;&#65039;</div>
+    <h2 class="bm-page-title" style="font-size: 24px;">Your wishlist is empty</h2>
+    <p style="color: var(--bm-text-muted); margin-bottom: 32px;">Save your favorite items to come back later!</p>
+    <a href="{{ url_for('shop') }}" class="bm-btn bm-btn-primary">
+        Browse Products
+    </a>
+</div>
+
+{% else %}
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+    {% for item in wishlist %}
+    <div style="background: var(--bm-surface); padding: 16px; border-radius: var(--bm-radius-md); border: 1px solid var(--bm-border); display: flex; align-items: center; gap: 16px;">
+        <div style="width: 64px; height: 64px; border-radius: var(--bm-radius-sm); overflow: hidden; background: #f1f5f9; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+            {% if item.image_url %}
+            <img src="{{ item.image_url }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+            {% else %}
+            <span style="font-size: 20px;">&#128295;</span>
+            {% endif %}
+        </div>
+        <div style="flex-grow: 1;">
+            <h3 style="font-weight: 700; margin-bottom: 4px;">{{ item.name }}</h3>
+            <p style="font-size: 13px; color: var(--bm-text-muted);">SKU: {{ item.sku }}</p>
+            <p style="font-size: 18px; font-weight: 800; color: #166534;">&#8377;{{ "%.0f"|format(item.price) }}</p>
+        </div>
+        <form method="POST" action="{{ url_for('add_to_cart') }}" style="display: inline;">
+            <input type="hidden" name="sku" value="{{ item.sku }}">
+            <input type="hidden" name="quantity" value="1">
+            <button type="submit" class="bm-btn bm-btn-accent">
+                <i class="fas fa-shopping-cart"></i> Move to Cart
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('remove_from_wishlist', sku=item.sku) }}" style="display: inline;">
+            <button type="submit" style="background: none; border: none; color: #991b1b; cursor: pointer; font-weight: 700; font-size: 14px;">&#10005; Remove</button>
+        </form>
+    </div>
+    {% endfor %}
+</div>
+
+{% endif %}
+
+{% endblock %}
