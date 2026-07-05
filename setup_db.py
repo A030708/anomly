@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS customers (
     phone TEXT,
     password TEXT NOT NULL,
     blocked BOOLEAN DEFAULT FALSE,
+    checkout_blocked_until TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -83,6 +84,9 @@ CREATE TABLE IF NOT EXISTS coupons (
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add checkout_blocked_until to existing customers table
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS checkout_blocked_until TIMESTAMPTZ DEFAULT NULL;
 
 -- Create addresses table
 CREATE TABLE IF NOT EXISTS addresses (

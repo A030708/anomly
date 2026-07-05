@@ -59,9 +59,8 @@
                 <form method="POST" action="{{ url_for('cancel_order', order_id=order.order_id) }}" onsubmit="return confirm('Are you sure you want to cancel this order?');" style="margin: 0;">
                     <button type="submit" class="bm-btn" style="padding: 8px 16px; font-size: 13px; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;">Cancel Order</button>
                 </form>
-                {% endif %}
-                {% if order.status == 'delivered' %}
-                <a href="{{ url_for('return_request', order_id=order.order_id) }}" class="bm-btn bm-btn-secondary" style="padding: 8px 16px; font-size: 13px; background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe;">Return / Replace</a>
+                {% elif order.status == 'cancelled' and order.payment_method != 'cod' %}
+                <a href="{{ url_for('payment_page', order_id=order.order_id) }}" class="bm-btn" style="padding: 8px 16px; font-size: 13px; background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; text-decoration: none;">Retry Payment</a>
                 {% endif %}
             </div>
         </div>

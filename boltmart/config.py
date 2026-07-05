@@ -22,11 +22,11 @@ class Config:
 
     APP_URL = os.getenv("APP_URL", "http://localhost:5001")
 
-    SMTP_HOST = os.getenv("SMTP_HOST", "")
+    SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USER = os.getenv("SMTP_USER", "")
     SMTP_PASS = os.getenv("SMTP_PASS", "")
-    SMTP_FROM = os.getenv("SMTP_FROM", "noreply@boltmart.in")
+    SMTP_FROM = os.getenv("SMTP_FROM", "")
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
 
     COMPANY_NAME = "BoltMart"

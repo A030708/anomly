@@ -9,6 +9,13 @@
         For your security, we've sent a 6-digit OTP to your email.
     </p>
 
+    {% if dev_otp %}
+    <div style="background:#f0f5ff; border:2px dashed #1a56db; border-radius:12px; padding:16px; margin:16px auto; max-width:220px;">
+        <p style="font-size:13px; color:#6b7280; margin:0 0 4px;">Dev mode: OTP</p>
+        <p style="font-size:32px; font-weight:800; color:#1a56db; letter-spacing:6px; margin:0;">{{ dev_otp }}</p>
+    </div>
+    {% endif %}
+
     {% if error %}
     <div class="bm-alert" style="background:#fff5f5; color:#e53e3e; border-left:4px solid #e53e3e; padding:12px; margin-bottom:20px;">
         <i class="fas fa-exclamation-circle"></i> {{ error }}

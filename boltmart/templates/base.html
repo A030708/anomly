@@ -47,7 +47,6 @@
                     </button>
                     <div class="bm-nav-dropdown" id="userDropdown">
                         <a href="{{ url_for('my_orders') }}"><i class="fas fa-box"></i> My Orders</a>
-                        <a href="{{ url_for('my_returns') }}"><i class="fas fa-undo"></i> Returns</a>
                         <a href="{{ url_for('manage_addresses') }}"><i class="fas fa-map-marker-alt"></i> Addresses</a>
                         <a href="{{ url_for('notifications') }}">
                             <i class="fas fa-bell"></i> Notifications
@@ -86,7 +85,6 @@
         {% if g.customer %}
         <div style="height: 1px; background: var(--bm-hairline); margin: 8px 0;"></div>
         <a href="{{ url_for('my_orders') }}"><i class="fas fa-box"></i> My Orders</a>
-        <a href="{{ url_for('my_returns') }}"><i class="fas fa-undo"></i> Returns</a>
         <a href="{{ url_for('manage_addresses') }}"><i class="fas fa-map-marker-alt"></i> Addresses</a>
         <a href="{{ url_for('notifications') }}"><i class="fas fa-bell"></i> Notifications</a>
         <a href="{{ url_for('profile') }}"><i class="fas fa-user"></i> Profile</a>
@@ -123,6 +121,11 @@
     </div>
 </footer>
 
+<div id="lightbox" onclick="closeLightbox()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; cursor:pointer; align-items:center; justify-content:center;">
+    <span style="position:absolute; top:20px; right:30px; color:#fff; font-size:36px; font-weight:bold;">&times;</span>
+    <img id="lightbox-img" src="" alt="" style="max-width:90vw; max-height:90vh; object-fit:contain; border-radius:8px; box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+</div>
+
 <script>
 function toggleUserMenu() {
     document.getElementById('userDropdown').classList.toggle('open');
@@ -131,6 +134,21 @@ function toggleUserMenu() {
 function toggleMobileMenu() {
     document.getElementById('mobileMenu').classList.toggle('open');
 }
+
+function openLightbox(img) {
+    if (!img || !img.src) return;
+    document.getElementById('lightbox-img').src = img.src;
+    document.getElementById('lightbox-img').alt = img.alt;
+    document.getElementById('lightbox').style.display = 'flex';
+}
+
+function closeLightbox() {
+    document.getElementById('lightbox').style.display = 'none';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeLightbox();
+});
 
 document.addEventListener('click', function(e) {
     var userMenu = document.getElementById('userMenu');
@@ -145,5 +163,6 @@ document.addEventListener('click', function(e) {
     }
 });
 </script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

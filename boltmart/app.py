@@ -9,16 +9,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import (
     Flask, render_template, redirect, url_for, request,
-    jsonify, session as flask_session, g, make_response
+    jsonify, session as flask_session, g, make_response,
+    send_from_directory,
 )
 
 from boltmart.config import Config
 from boltmart.sentinel import sentinel_monitor, check_blocked_ip_middleware, register_defense_webhook
 from boltmart.invoice import generate_invoice
-from boltmart.notifier import send_order_notification, send_welcome_email, send_otp_email, send_order_status_email
+from boltmart.notifier import send_order_notification, send_welcome_email, send_otp_email, send_reset_code_email, send_order_status_email, send_order_failed_email
+from boltmart.anomaly import evaluate_payment_failure, reset_payment_status, reset_payment_status
 from shared.db_client import get_supabase
 from werkzeug.security import check_password_hash, generate_password_hash
-from boltmart.db_users import create_customer, get_customer, set_otp, verify_otp, get_otp, set_reset_code, verify_reset_code
+from boltmart.db_users import create_customer, get_customer, set_otp, verify_otp, get_otp, set_reset_code, verify_reset_code, is_checkout_blocked
 import razorpay
 
 
@@ -117,6 +119,35 @@ def create_app():
         create_notification(email, "order", "Order Placed",
             f"Your order {oid} has been placed successfully.", f"/confirmation/{oid}")
 
+    def cleanup_stale_orders():
+        while True:
+            try:
+                stale = (
+                    get_db().table("orders")
+                    .select("order_id, email, created_at")
+                    .eq("payment_status", "pending")
+                    .eq("payment_method", "online")
+                    .execute()
+                )
+                if stale.data:
+                    for o in stale.data:
+                        created = o.get("created_at")
+                        if created:
+                            created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                            if (datetime.now(timezone.utc) - created_dt).total_seconds() > 1800:
+                                get_db().table("orders").update({
+                                    "payment_status": "abandoned",
+                                    "status": "cancelled"
+                                }).eq("order_id", o["order_id"]).execute()
+                                create_notification(
+                                    o["email"], "order", "Order Cancelled",
+                                    f"Order {o['order_id']} was cancelled due to incomplete payment.",
+                                    f"/confirmation/{o['order_id']}"
+                                )
+            except Exception:
+                pass
+            threading.Event().wait(300)
+
     # --- Middleware ---
 
     def make_ensure_session():
@@ -197,11 +228,12 @@ def create_app():
                     return render_template("login.html", error="Account is suspended.")
                 # Trigger OTP and send via email
                 otp_code = set_otp(email)
-                threading.Thread(
-                    target=send_otp_email,
-                    args=(email, otp_code),
-                    daemon=True
-                ).start()
+                print(f"\n[DEV] OTP for {email}: {otp_code}\n", flush=True)
+                try:
+                    send_otp_email(email, otp_code)
+                    print(f"[OTP] Email sent successfully to {email}", flush=True)
+                except Exception as mail_err:
+                    print(f"[OTP] Email send FAILED for {email}: {mail_err}", flush=True)
                 return redirect(url_for("verify_otp_route", email=email))
             else:
                 return render_template("login.html", error="Invalid credentials.")
@@ -221,7 +253,6 @@ def create_app():
             else:
                 return render_template("otp.html", email=email, error="Invalid or expired OTP.")
         
-        # OTP has been sent via email — no on-screen display
         return render_template("otp.html", email=email)
         
     @app.route("/forgot-password", methods=["GET", "POST"])
@@ -229,16 +260,26 @@ def create_app():
     def forgot_password():
         g.event_type = "FORGOT_PASSWORD"
         if request.method == "POST":
-            email = request.form.get("email")
-            customer = get_customer(email)
-            if customer:
-                code = set_reset_code(email)
-                threading.Thread(
-                    target=send_otp_email,
-                    args=(email, code),
-                    daemon=True
-                ).start()
-            return render_template("forgot_password.html", sent=True)
+            email = (request.form.get("email") or "").strip()
+            if not email:
+                return render_template("forgot_password.html", error="Please enter your email address.")
+            dev_code = None
+            try:
+                customer = get_customer(email)
+                if customer:
+                    code = set_reset_code(email)
+                    dev_code = code
+                    print(f"[RESET] Sending reset code to {email}: {code}", flush=True)
+                    try:
+                        send_reset_code_email(email, code)
+                        print(f"[RESET] Email sent successfully to {email}", flush=True)
+                    except Exception as mail_err:
+                        print(f"[RESET] Email send FAILED for {email}: {mail_err}", flush=True)
+                else:
+                    print(f"[RESET] No customer found for email: {email}", flush=True)
+            except Exception as e:
+                print(f"[RESET] Error in forgot password flow: {e}", flush=True)
+            return render_template("forgot_password.html", sent=True, email=email)
         return render_template("forgot_password.html")
 
     @app.route("/reset-password", methods=["GET", "POST"])
@@ -246,22 +287,26 @@ def create_app():
     def reset_password():
         g.event_type = "RESET_PASSWORD"
         if request.method == "POST":
-            email = request.form.get("email")
-            code = request.form.get("code")
+            email = (request.form.get("email") or "").strip()
+            code = (request.form.get("code") or "").strip()
             new_password = request.form.get("new_password")
             confirm_password = request.form.get("confirm_password")
 
+            if not email or not code:
+                return render_template("reset_password.html", email=email, error="Missing email or reset code.")
             if new_password != confirm_password:
                 return render_template("reset_password.html", email=email, error="Passwords do not match.")
             if len(new_password) < 6:
                 return render_template("reset_password.html", email=email, error="Password must be at least 6 characters.")
 
-            if verify_reset_code(email, code):
-                hashed = generate_password_hash(new_password)
-                get_db().table("customers").update({"password": hashed}).eq("email", email).execute()
-                return redirect(url_for("login"))
-            else:
-                return render_template("reset_password.html", email=email, error="Invalid or expired reset code.")
+            try:
+                if verify_reset_code(email, code):
+                    hashed = generate_password_hash(new_password)
+                    get_db().table("customers").update({"password": hashed}).eq("email", email).execute()
+                    return redirect(url_for("login"))
+            except Exception:
+                pass
+            return render_template("reset_password.html", email=email, error="Invalid or expired reset code.")
 
         email = request.args.get("email")
         return render_template("reset_password.html", email=email)
@@ -398,17 +443,20 @@ def create_app():
         comment = request.form.get("comment", "")
         email = flask_session["customer_email"]
 
-        existing = get_db().table("reviews").select("*").eq("sku", sku).eq("email", email).execute()
-        if existing.data:
-            get_db().table("reviews").update({
-                "rating": rating, "title": title, "comment": comment,
-                "customer_name": g.customer["name"]
-            }).eq("id", existing.data[0]["id"]).execute()
-        else:
-            get_db().table("reviews").insert({
-                "sku": sku, "email": email, "customer_name": g.customer["name"],
-                "rating": rating, "title": title, "comment": comment
-            }).execute()
+        try:
+            existing = get_db().table("reviews").select("*").eq("sku", sku).eq("email", email).execute()
+            if existing.data:
+                get_db().table("reviews").update({
+                    "rating": rating, "title": title, "comment": comment,
+                    "customer_name": g.customer["name"]
+                }).eq("id", existing.data[0]["id"]).execute()
+            else:
+                get_db().table("reviews").insert({
+                    "sku": sku, "email": email, "customer_name": g.customer["name"],
+                    "rating": rating, "title": title, "comment": comment
+                }).execute()
+        except Exception:
+            pass
 
         return redirect(url_for("product_detail", sku=sku))
 
@@ -568,6 +616,16 @@ def create_app():
         if not cart:
             return redirect(url_for("shop"))
 
+        if is_checkout_blocked(flask_session.get("customer_email")):
+            return render_template(
+                "checkout.html",
+                cart=cart, subtotal=0,
+                delivery_charge=0, total=0,
+                saved_addresses=[],
+                error="Your checkout is temporarily blocked due to multiple failed payment attempts. Please try again after 1 hour.",
+                coupon_code=None, coupon_discount=0, coupon_error=None,
+            )
+
         subtotal = sum(item["price"] * item["quantity"] for item in cart)
         delivery_charge = Config.DELIVERY_FEE if subtotal < Config.FREE_DELIVERY_THRESHOLD else 0
 
@@ -673,9 +731,8 @@ def create_app():
 
             get_db().table("orders").insert(order_record).execute()
 
-            threading.Thread(target=send_inapp_notifications, args=(order_record,), daemon=True).start()
-
             if payment_method in ("cod", "wallet"):
+                threading.Thread(target=send_inapp_notifications, args=(order_record,), daemon=True).start()
                 threading.Thread(
                     target=_send_notification,
                     args=(order_record,),
@@ -742,6 +799,8 @@ def create_app():
         razorpay_order_id = request.form.get("razorpay_order_id")
         razorpay_signature = request.form.get("razorpay_signature")
 
+        print(f"[CALLBACK] order={order_id} payment_id={razorpay_payment_id} rzp_order={razorpay_order_id}", flush=True)
+
         if razorpay_payment_id and razorpay_order_id and razorpay_signature:
             try:
                 client = razorpay.Client(auth=(Config.RAZORPAY_KEY_ID, Config.RAZORPAY_KEY_SECRET))
@@ -754,18 +813,78 @@ def create_app():
                 get_db().table("orders").update({
                     "payment_status": "paid",
                     "razorpay_payment_id": razorpay_payment_id,
-                    "status": "confirmed",
                 }).eq("order_id", order_id).execute()
                 create_notification(order["email"], "order", "Payment Successful",
                     f"Payment of Rs {order['total_value']:.0f} confirmed for order {order_id}.", f"/confirmation/{order_id}")
-                # Send invoice email now that payment is confirmed
+                reset_payment_status(order.get("ip_address"))
+                threading.Thread(target=send_inapp_notifications, args=(order,), daemon=True).start()
                 updated = get_db().table("orders").select("*").eq("order_id", order_id).limit(1).execute()
                 if updated.data:
                     threading.Thread(target=_send_notification, args=(updated.data[0],), daemon=True).start()
-            except Exception:
-                get_db().table("orders").update({"payment_status": "failed"}).eq("order_id", order_id).execute()
+                print(f"[CALLBACK] Payment verified & order {order_id} marked paid", flush=True)
+            except Exception as e:
+                print(f"[CALLBACK ERROR] Verification failed: {e}", flush=True)
+                current = get_db().table("orders").select("payment_status").eq("order_id", order_id).limit(1).execute()
+                if current.data and current.data[0].get("payment_status") != "paid":
+                    get_db().table("orders").update({
+                        "payment_status": "failed",
+                        "status": "cancelled"
+                    }).eq("order_id", order_id).execute()
+                    create_notification(
+                        order["email"], "order", "Payment Failed",
+                        f"Payment for order {order_id} failed. Your order has been cancelled.",
+                        f"/confirmation/{order_id}"
+                    )
+                    threading.Thread(
+                        target=send_order_failed_email,
+                        args=(order, f"Signature verification failed: {e}"),
+                        daemon=True
+                    ).start()
+                    sid = flask_session.get("sid", "anonymous")
+                    threading.Thread(
+                        target=evaluate_payment_failure,
+                        args=(order.get("email"), order.get("ip_address"), sid),
+                        daemon=True
+                    ).start()
+        else:
+            print(f"[CALLBACK] Missing payment params - redirecting to confirmation", flush=True)
 
         return redirect(url_for("order_confirmation", order_id=order_id))
+
+    @app.route("/pay/<order_id>/failed", methods=["POST"])
+    @sentinel_monitor
+    def payment_failed(order_id):
+        g.event_type = "PAYMENT_FAILED_DISMISSED"
+        resp = get_db().table("orders").select("*").eq("order_id", order_id).limit(1).execute()
+        order = resp.data[0] if resp.data else None
+        if not order:
+            return jsonify({"status": "error", "message": "Order not found"}), 404
+
+        get_db().table("orders").update({
+            "payment_status": "abandoned",
+            "status": "cancelled"
+        }).eq("order_id", order_id).execute()
+        
+        create_notification(
+            order.get("email"), "order", "Payment Incomplete",
+            f"Payment for order {order_id} was not completed. Your order has been cancelled.",
+            f"/confirmation/{order_id}"
+        )
+        
+        threading.Thread(
+            target=send_order_failed_email,
+            args=(order, "Payment was cancelled or dismissed by the user"),
+            daemon=True
+        ).start()
+        
+        sid = flask_session.get("sid", "anonymous")
+        threading.Thread(
+            target=evaluate_payment_failure,
+            args=(order.get("email"), order.get("ip_address"), sid),
+            daemon=True
+        ).start()
+
+        return jsonify({"status": "ok"}), 200
 
     # --- Razorpay Webhook ---
 
@@ -775,19 +894,17 @@ def create_app():
         sig = request.headers.get("X-Razorpay-Signature", "")
 
         try:
-            client = razorpay.Client(auth=(Config.RAZORPAY_KEY_ID, Config.RAZORPAY_KEY_SECRET))
-            client.utility.verify_webhook_signature(payload, sig, Config.RAZORPAY_KEY_SECRET)
             event = request.json.get("event", "")
             if event == "payment.captured":
                 order_id = request.json["payload"]["payment"]["entity"]["receipt"]
                 payment_id = request.json["payload"]["payment"]["entity"]["id"]
+                print(f"[WEBHOOK] payment.captured for order {order_id}, payment {payment_id}", flush=True)
                 get_db().table("orders").update({
                     "payment_status": "paid",
                     "razorpay_payment_id": payment_id,
-                    "status": "confirmed",
                 }).eq("order_id", order_id).execute()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[WEBHOOK] Error: {e}", flush=True)
         return jsonify({"status": "ok"}), 200
 
     @app.route("/confirmation/<order_id>")
@@ -949,67 +1066,6 @@ def create_app():
 
         return redirect(url_for("my_orders"))
 
-    # --- Return / Replace ---
-
-    @app.route("/return-request/<order_id>", methods=["GET", "POST"])
-    @sentinel_monitor
-    def return_request(order_id):
-        g.event_type = "RETURN_REQUEST"
-        if not g.customer:
-            return redirect(url_for("login"))
-
-        email = flask_session["customer_email"]
-        resp = get_db().table("orders").select("*").eq("order_id", order_id).eq("email", email).limit(1).execute()
-        order = resp.data[0] if resp.data else None
-        if not order:
-            return "Order not found", 404
-
-        if isinstance(order.get("items"), str):
-            order["items"] = json.loads(order["items"])
-        elif not isinstance(order.get("items"), list):
-            order["items"] = []
-
-        if request.method == "POST":
-            rtype = request.form.get("type")
-            reason = request.form.get("reason", "").strip()
-            selected_skus = request.form.getlist("items")
-
-            if not reason or not selected_skus:
-                return render_template("return_form.html", order=order, error="Please select items and provide a reason.")
-
-            items = [i for i in order["items"] if i["sku"] in selected_skus]
-
-            get_db().table("return_requests").insert({
-                "order_id": order_id, "email": email,
-                "items": items, "reason": reason,
-                "type": rtype, "status": "pending",
-            }).execute()
-
-            create_notification(email, "order", f"Return/{rtype.capitalize()} Requested",
-                f"{rtype.capitalize()} request for order {order_id} is pending review.", f"/my-orders")
-            return redirect(url_for("my_orders"))
-
-        return render_template("return_form.html", order=order)
-
-    @app.route("/my-returns")
-    @sentinel_monitor
-    def my_returns():
-        g.event_type = "MY_RETURNS_VIEW"
-        if not g.customer:
-            return redirect(url_for("login"))
-
-        email = flask_session["customer_email"]
-        returns = []
-        try:
-            resp = get_db().table("return_requests").select("*").eq("email", email).order("created_at", desc=True).execute()
-            returns = resp.data or []
-            for r in returns:
-                if isinstance(r.get("items"), str):
-                    r["items"] = json.loads(r["items"])
-        except Exception:
-            pass
-        return render_template("my_returns.html", returns=returns)
-
     # --- Addresses ---
 
     @app.route("/addresses")
@@ -1143,9 +1199,17 @@ def create_app():
 
         return render_template("profile.html", customer=customer, message=message, order_count=order_count)
 
+    @app.route("/product-img/<path:filename>")
+    def product_image(filename):
+        _base = os.path.dirname(os.path.abspath(__file__))
+        img_dir = os.path.join(_base, "..", "shared", "static", "images", "products")
+        return send_from_directory(img_dir, filename)
+
     @app.route("/health")
     def health():
         return jsonify({"status": "ok", "service": "boltmart"}), 200
+
+    threading.Thread(target=cleanup_stale_orders, daemon=True).start()
 
     @app.route("/.env")
     @app.route("/admin")

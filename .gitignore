@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 *.pyo
 warehouse_os/__pycache__/
+
+*.txt
+*.log
+.vscode/

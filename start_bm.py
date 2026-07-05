@@ -1,5 +1,5 @@
-import sys
-sys.path.insert(0, "C:/Users/abhir/OneDrive/Desktop/proj")
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from boltmart.app import create_app
 app = create_app()
 print("BoltMart started", flush=True)

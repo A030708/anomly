@@ -17,14 +17,21 @@ def _send_email(to_email, subject, html_body, plain_body=None, attachments=None,
     """Core email sender used by all notification functions."""
     config = _get_smtp_config()
 
-    if not config.SMTP_HOST:
-        logger.info("SMTP not configured. Email logged:\nSubject: %s\nTo: %s", subject, to_email)
+    smtp_host = config.SMTP_HOST
+    smtp_port = config.SMTP_PORT
+    smtp_user = config.SMTP_USER
+    smtp_pass = config.SMTP_PASS
+    smtp_from = config.SMTP_FROM
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        print(f"[EMAIL] SMTP not fully configured. HOST={smtp_host!r}, USER={smtp_user!r}, PASS={'***' if smtp_pass else '(empty)'}, FROM={smtp_from!r}", flush=True)
+        print(f"[EMAIL] Would send to {to_email}: {subject}", flush=True)
         return False
 
     try:
         msg = MIMEMultipart("mixed")
         msg["Subject"] = subject
-        msg["From"] = config.SMTP_FROM
+        msg["From"] = smtp_from
         msg["To"] = to_email
 
         if extra_headers:
@@ -45,15 +52,20 @@ def _send_email(to_email, subject, html_body, plain_body=None, attachments=None,
                 part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
                 msg.attach(part)
 
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as server:
+        print(f"[EMAIL] Sending to {to_email} via {smtp_host}:{smtp_port} from {smtp_from} ...", flush=True)
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            server.ehlo()
             server.starttls()
-            server.login(config.SMTP_USER, config.SMTP_PASS)
+            server.ehlo()
+            server.login(smtp_user, smtp_pass)
             server.send_message(msg)
             logger.info("Email sent to %s — Subject: %s", to_email, subject)
+            print(f"[EMAIL] Sent successfully to {to_email}", flush=True)
             return True
 
     except Exception as e:
         logger.error("Failed to send email to %s: %s", to_email, e)
+        print(f"[EMAIL] FAILED to send to {to_email}: {type(e).__name__}: {e}", flush=True)
         return False
 
 
@@ -135,6 +147,8 @@ def send_otp_email(email, otp_code):
     if not email:
         return
 
+    print(f"\n[DEV] OTP for {email}: {otp_code}\n", flush=True)
+
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -151,7 +165,7 @@ def send_otp_email(email, otp_code):
 </div>
 
 <p style="font-size:13px;color:#9ca3af;">This code expires in <strong>5 minutes</strong>.</p>
-<p style="font-size:12px;color:#d1d5db;">If you didn't request this, please ignore this email.</p>
+<p style="font-size:12px;color:#d1d5db;">If you didn't request this, please ignore email.</p>
 </div>
 <div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb;">
 <p style="font-size:12px;color:#9ca3af;margin:0;">BoltMart &mdash; Industrial &amp; Safety Equipment Supply</p>
@@ -166,6 +180,49 @@ def send_otp_email(email, otp_code):
 
 
 # ─────────────────────────────────────────────
+# 2b. RESET CODE EMAIL (on forgot password)
+# ─────────────────────────────────────────────
+
+def send_reset_code_email(email, reset_code):
+    """Send the password reset verification code via email."""
+    config = _get_smtp_config()
+
+    if not email:
+        return
+
+    print(f"\n[DEV] Password reset code for {email}: {reset_code}\n", flush=True)
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:Segoe UI,sans-serif;background:#f3f4f6;margin:0;padding:24px;">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+<div style="background:#dc2626;padding:24px;text-align:center;">
+<h1 style="color:#fff;margin:0;font-size:22px;">&#128274; Password Reset Request</h1>
+</div>
+<div style="padding:32px;text-align:center;">
+<p style="font-size:14px;color:#6b7280;">Use the following code to reset your password:</p>
+
+<div style="background:#fef2f2;border:2px dashed #dc2626;border-radius:12px;padding:24px;margin:24px auto;max-width:250px;">
+<p style="font-size:36px;font-weight:800;color:#dc2626;letter-spacing:8px;margin:0;">{reset_code}</p>
+</div>
+
+<p style="font-size:13px;color:#9ca3af;">This code expires in <strong>5 minutes</strong>.</p>
+<p style="font-size:12px;color:#d1d5db;">If you didn't request this, please ignore this email.</p>
+</div>
+<div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+<p style="font-size:12px;color:#9ca3af;margin:0;">BoltMart &mdash; Industrial &amp; Safety Equipment Supply</p>
+</div>
+</div>
+</body>
+</html>"""
+
+    plain = f"Your BoltMart password reset code is: {reset_code}. It expires in 5 minutes."
+
+    _send_email(email, f"Your BoltMart Password Reset Code: {reset_code}", html, plain)
+
+
+# ─────────────────────────────────────────────
 # 3. ORDER CONFIRMATION EMAIL (on purchase)
 # ─────────────────────────────────────────────
 
@@ -175,7 +232,7 @@ def send_order_notification(order, pdf_bytes):
 
     email = order.get("email")
     if not email:
-        logger.warning("No email on order %s, skipping notification", order.get("order_id"))
+        logger.warning("No email on order, skipping notification")
         return
 
     # FIX: order_id must be defined BEFORE using it
@@ -409,3 +466,92 @@ def send_user_suspended(email, reason):
 
     _send_email(email, "Account Suspended — BoltMart", html,
                 f"Your BoltMart account has been suspended. Reason: {reason}")
+
+
+# ─────────────────────────────────────────────
+# 7. CHECKOUT BLOCKED EMAIL (to user)
+# ─────────────────────────────────────────────
+
+def send_checkout_blocked_email(email, name):
+    config = _get_smtp_config()
+    if not email:
+        return
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:Segoe UI,sans-serif;background:#f3f4f6;margin:0;padding:24px;">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);border-top:4px solid #f59e0b;">
+<div style="background:#fffbeb;padding:24px;text-align:center;">
+<h1 style="color:#92400e;margin:0;font-size:22px;">&#9888;&#65039; Checkout Temporarily Blocked</h1>
+</div>
+<div style="padding:32px;">
+<p style="font-size:15px;color:#374151;">Hi <strong>{name}</strong>,</p>
+<p style="font-size:14px;color:#6b7280;">Your checkout has been temporarily blocked due to multiple failed payment attempts.</p>
+<div style="background:#fffbeb;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #fde68a;">
+<p style="font-size:13px;color:#92400e;margin:0;"><strong>What happened?</strong> We detected 3 consecutive failed payment attempts from your account.</p>
+<p style="font-size:13px;color:#92400e;margin:8px 0 0;"><strong>When can I try again?</strong> Please wait 1 hour and try again.</p>
+</div>
+<p style="font-size:13px;color:#6b7280;">You can still browse products, add items to your cart, and view your orders. Only checkout is temporarily restricted as a security measure.</p>
+<p style="font-size:13px;color:#6b7280;">If you believe this is a mistake, please contact our support team at <a href="mailto:support@boltmart.in" style="color:#1a56db;">support@boltmart.in</a>.</p>
+</div>
+<div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+<p style="font-size:12px;color:#9ca3af;margin:0;">BoltMart &mdash; Industrial &amp; Safety Equipment Supply</p>
+</div>
+</div>
+</body>
+</html>"""
+
+    _send_email(email, "Checkout Temporarily Blocked — BoltMart", html,
+                f"Your checkout is blocked for 1 hour due to multiple failed payment attempts.")
+
+
+# ─────────────────────────────────────────────
+# 8. ORDER FAILED EMAIL (to user)
+# ─────────────────────────────────────────────
+
+def send_order_failed_email(order, reason):
+    """Send order failure notification to user."""
+    config = _get_smtp_config()
+
+    email = order.get("email")
+    if not email:
+        return
+
+    order_id = order.get("order_id", "N/A")
+    name = order.get("customer_name", "Customer")
+    total = order.get("total_value", 0)
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:Segoe UI,sans-serif;background:#f3f4f6;margin:0;padding:24px;">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);border-top:4px solid #dc2626;">
+<div style="background:#fef2f2;padding:24px;text-align:center;">
+<h1 style="color:#dc2626;margin:0;font-size:22px;">&#10060; Payment Failed</h1>
+<p style="color:#991b1b;margin:8px 0 0;font-size:14px;">Your order could not be completed</p>
+</div>
+<div style="padding:32px;">
+<p style="font-size:15px;color:#374151;">Hi <strong>{name}</strong>,</p>
+<p style="font-size:14px;color:#6b7280;">Unfortunately, the payment for your order <strong>{order_id}</strong> failed.</p>
+<div style="background:#fef2f2;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #fecaca;">
+<p style="font-size:13px;color:#991b1b;margin:0;"><strong>Reason:</strong> {reason}</p>
+<p style="font-size:13px;color:#991b1b;margin:8px 0 0;"><strong>Amount:</strong> &#8377;{total:,.0f}</p>
+</div>
+<p style="font-size:13px;color:#6b7280;">No money was deducted for this order. If it was, it will be refunded automatically by your bank within 5-7 business days.</p>
+<div style="text-align:center;margin:32px 0;">
+<a href="{config.APP_URL}/checkout" style="background:#dc2626;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;display:inline-block;">
+Retry Payment &#8594;
+</a>
+</div>
+</div>
+<div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+<p style="font-size:12px;color:#9ca3af;margin:0;">BoltMart &mdash; Industrial &amp; Safety Equipment Supply</p>
+</div>
+</div>
+</body>
+</html>"""
+
+    plain = f"Payment for Order {order_id} failed. Reason: {reason}. Amount: Rs.{total:,.0f}. Retry at {config.APP_URL}/checkout"
+
+    _send_email(email, f"Payment Failed - Order {order_id}", html, plain)

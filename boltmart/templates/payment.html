@@ -49,8 +49,13 @@
             },
             modal: {
                 ondismiss: function() {
-                    document.getElementById('pay-btn').disabled = false;
-                    document.getElementById('pay-btn').textContent = 'Retry Payment';
+                    document.getElementById('pay-btn').disabled = true;
+                    document.getElementById('pay-btn').textContent = 'Cancelling...';
+                    fetch("{{ url_for('payment_failed', order_id=order.order_id) }}", {
+                        method: 'POST'
+                    }).then(() => {
+                        window.location.href = "{{ url_for('shop') }}";
+                    });
                 }
             },
             theme: { color: "#1a56db" }

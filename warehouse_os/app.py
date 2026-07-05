@@ -9,12 +9,14 @@ from datetime import datetime, timezone
 from uuid import uuid4
 from functools import wraps
 import requests as req
+from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import (
     Flask, render_template, request, redirect,
-    url_for, session as flask_session, g, abort, jsonify, Response, flash
+    url_for, session as flask_session, g, abort, jsonify, Response, flash,
+    send_from_directory,
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -98,6 +100,11 @@ def create_app():
             get_db().table("audit_log").insert(record).execute()
         except Exception:
             pass
+
+    def _payment_valid(order):
+        if order.get("payment_method") == "cod":
+            return True
+        return order.get("payment_status") == "paid"
 
     @app.before_request
     def ensure_session_id():
@@ -236,7 +243,7 @@ def create_app():
 
             order_counts = {}
             for s in ("pending", "packed", "shipped", "delivered"):
-                c = db.table("orders").select("id", count="exact").eq("status", s).execute().count or 0
+                c_data = db.table("orders").select("id, payment_status, payment_method").eq("status", s).execute().data or []; c = sum(1 for o in c_data if o.get("payment_status") == "paid" or o.get("payment_method") == "cod")
                 order_counts[s] = c
 
             low_stock_products = [
@@ -279,22 +286,24 @@ def create_app():
                 for w in writeoffs_today
             )
 
-            pending_count = (
+            pending_data = (
                 db.table("orders")
-                .select("id", count="exact")
+                .select("id, payment_status, payment_method")
                 .eq("status", "pending")
-                .execute()
-                .count or 0
-            )
-
-            recent_orders = (
-                db.table("orders")
-                .select("*")
-                .order("created_at", desc=True)
-                .limit(5)
                 .execute()
                 .data or []
             )
+            pending_count = sum(1 for o in pending_data if o.get("payment_status") == "paid" or o.get("payment_method") == "cod")
+
+            recent_all = (
+                db.table("orders")
+                .select("*")
+                .order("created_at", desc=True)
+                .limit(50)
+                .execute()
+                .data or []
+            )
+            recent_orders = [o for o in recent_all if o.get("payment_status") == "paid" or o.get("payment_method") == "cod"][:5]
 
             packed_today_all = (
                 db.table("inventory_movements")
@@ -309,7 +318,7 @@ def create_app():
 
             order_counts = {}
             for s in ("pending", "packed", "shipped", "delivered"):
-                c = db.table("orders").select("id", count="exact").eq("status", s).execute().count or 0
+                c_data = db.table("orders").select("id, payment_status, payment_method").eq("status", s).execute().data or []; c = sum(1 for o in c_data if o.get("payment_status") == "paid" or o.get("payment_method") == "cod")
                 order_counts[s] = c
 
             low_stock_products = [
@@ -333,24 +342,26 @@ def create_app():
 
         elif role == 'delivery':
             today_start = datetime.now(timezone.utc).isoformat()[:10]
-            delivered_today_count = (
+            delivered_data = (
                 db.table("orders")
-                .select("id", count="exact")
+                .select("id, payment_status, payment_method")
                 .eq("status", "delivered")
                 .gte("updated_at", today_start)
-                .execute().count or 0
+                .execute().data or []
             )
-            shipped_orders = (
+            delivered_today_count = sum(1 for o in delivered_data if o.get("payment_status") == "paid" or o.get("payment_method") == "cod")
+            shipped_all = (
                 db.table("orders")
                 .select("*")
                 .eq("status", "shipped")
                 .order("updated_at", desc=True)
-                .limit(5)
+                .limit(50)
                 .execute().data or []
             )
+            shipped_orders = [o for o in shipped_all if o.get("payment_status") == "paid" or o.get("payment_method") == "cod"][:5]
             order_counts = {}
             for s in ("pending", "packed", "shipped", "delivered"):
-                c = db.table("orders").select("id", count="exact").eq("status", s).execute().count or 0
+                c_data = db.table("orders").select("id, payment_status, payment_method").eq("status", s).execute().data or []; c = sum(1 for o in c_data if o.get("payment_status") == "paid" or o.get("payment_method") == "cod")
                 order_counts[s] = c
             return render_template(
                 "dashboard.html",
@@ -360,13 +371,14 @@ def create_app():
             )
 
         else: # staff
-            pending_count = (
+            pending_data = (
                 db.table("orders")
-                .select("id", count="exact")
+                .select("id, payment_status, payment_method")
                 .eq("status", "pending")
                 .execute()
-                .count or 0
+                .data or []
             )
+            pending_count = sum(1 for o in pending_data if o.get("payment_status") == "paid" or o.get("payment_method") == "cod")
 
             today_start = datetime.now(timezone.utc).isoformat()[:10]
             packed_today_count = (
@@ -379,15 +391,16 @@ def create_app():
                 .count or 0
             )
 
-            recent_orders = (
+            recent_all = (
                 db.table("orders")
                 .select("*")
                 .eq("status", "pending")
                 .order("created_at", desc=True)
-                .limit(5)
+                .limit(50)
                 .execute()
                 .data or []
             )
+            recent_orders = [o for o in recent_all if o.get("payment_status") == "paid" or o.get("payment_method") == "cod"][:5]
 
             low_stock_products = [
                 {"sku": p["sku"], "name": p["name"], "stock": p["stock_count"], "reorder": p["reorder_level"]}
@@ -397,7 +410,7 @@ def create_app():
 
             order_counts = {}
             for s in ("pending", "packed", "shipped", "delivered"):
-                c = db.table("orders").select("id", count="exact").eq("status", s).execute().count or 0
+                c_data = db.table("orders").select("id, payment_status, payment_method").eq("status", s).execute().data or []; c = sum(1 for o in c_data if o.get("payment_status") == "paid" or o.get("payment_method") == "cod")
                 order_counts[s] = c
 
             return render_template(
@@ -420,7 +433,7 @@ def create_app():
 
         status = request.args.get("status", "pending")
 
-        orders = (
+        all_orders = (
             get_db()
             .table("orders")
             .select("*")
@@ -430,6 +443,7 @@ def create_app():
             .execute()
             .data or []
         )
+        orders = [o for o in all_orders if o.get("payment_status") == "paid" or o.get("payment_method") == "cod"]
 
         invoice_threshold = _load_config().get("invoice_threshold", 25000)
         return render_template("fulfillment.html", orders=orders, status=status, invoice_threshold=invoice_threshold)
@@ -485,6 +499,8 @@ def create_app():
 
         if order.get("status") not in ("pending", "assigned"):
             return "Order cannot be packed from current status", 400
+        if not _payment_valid(order):
+            return "Cannot pack order without valid payment", 400
 
         items = order.get("items") or []
 
@@ -554,6 +570,8 @@ def create_app():
             return "Order not found", 404
         if order.get("status") != "packed":
             return "Order must be packed first", 400
+        if not _payment_valid(order):
+            return "Cannot ship order without valid payment", 400
 
         db.table("orders").update({
             "status": "shipped",
@@ -577,6 +595,8 @@ def create_app():
             return "Order not found", 404
         if order.get("status") != "shipped":
             return "Order must be shipped first", 400
+        if not _payment_valid(order):
+            return "Cannot deliver order without valid payment", 400
 
         db.table("orders").update({
             "status": "delivered",
@@ -593,13 +613,14 @@ def create_app():
     @sentinel_monitor
     def delivery_queue():
         g.event_type = "DELIVERY_QUEUE_VIEW"
-        orders = (
+        shipped_all = (
             get_db().table("orders")
             .select("*")
             .eq("status", "shipped")
             .order("updated_at", desc=True)
             .execute().data or []
         )
+        orders = [o for o in shipped_all if o.get("payment_status") == "paid" or o.get("payment_method") == "cod"]
         return render_template("delivery.html", orders=orders)
 
     @app.route("/delivery/<order_id>/deliver", methods=["POST"])
@@ -615,6 +636,8 @@ def create_app():
             return "Order not found", 404
         if order.get("status") != "shipped":
             return "Order must be shipped first", 400
+        if not _payment_valid(order):
+            return "Cannot deliver order without valid payment", 400
 
         recipient_name = request.form.get("recipient_name", "").strip()
         delivery_notes = request.form.get("delivery_notes", "").strip()
@@ -641,22 +664,68 @@ def create_app():
 
     # ---------------- PRODUCT IMAGE HELPERS ----------------
 
-    PRODUCT_IMG_DIR = os.path.join(app.static_folder, "product_images")
-    os.makedirs(PRODUCT_IMG_DIR, exist_ok=True)
+    _BASE = os.path.dirname(os.path.abspath(__file__))
+    SHARED_IMG_DIR = os.path.join(_BASE, "..", "shared", "static", "images", "products")
+    WOS_IMG_DIR = os.path.join(_BASE, "static", "images", "products")
+    BM_IMG_DIR = os.path.join(_BASE, "..", "boltmart", "static", "images", "products")
+    for d in (SHARED_IMG_DIR, WOS_IMG_DIR, BM_IMG_DIR):
+        os.makedirs(d, exist_ok=True)
+    PRODUCT_IMG_DIR = SHARED_IMG_DIR
 
     def _save_product_image(file, sku):
         if file and file.filename:
             ext = os.path.splitext(file.filename)[1] or ".jpg"
+            if ext.lower() not in (".jpg", ".jpeg", ".png", ".webp"):
+                ext = ".jpg"
             filename = f"{sku}{ext}"
             filepath = os.path.join(PRODUCT_IMG_DIR, filename)
-            file.save(filepath)
-            return filename
+            try:
+                img = Image.open(file)
+                img.thumbnail((800, 800), Image.LANCZOS)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                # always save as JPEG in the primary attempt
+                jpg_filepath = os.path.join(PRODUCT_IMG_DIR, f"{sku}.jpg")
+                img.save(jpg_filepath, "JPEG", quality=85)
+                saved_rel = f"/static/images/products/{sku}.jpg"
+                _mirror_image(jpg_filepath, saved_rel)
+                # remove leftover with wrong extension if any
+                if jpg_filepath != filepath and os.path.exists(filepath):
+                    try:
+                        os.remove(filepath)
+                    except Exception:
+                        pass
+                return saved_rel
+            except Exception:
+                try:
+                    file.seek(0)
+                    file.save(filepath)
+                    saved_rel = f"/static/images/products/{filename}"
+                    _mirror_image(filepath, saved_rel)
+                    return saved_rel
+                except Exception:
+                    flash("Could not save product image. Check file size and permissions.")
+                    return None
         return None
+
+    def _mirror_image(src_path, rel_url):
+        try:
+            import shutil
+            for d in (WOS_IMG_DIR, BM_IMG_DIR):
+                dst = os.path.join(d, os.path.basename(src_path))
+                if os.path.abspath(src_path) != os.path.abspath(dst):
+                    shutil.copy2(src_path, dst)
+        except Exception:
+            pass
 
     def _product_image_url(product):
         if product and product.get("image_url"):
-            return url_for("static", filename=f"product_images/{product['image_url']}")
+            return product["image_url"]
         return None
+
+    @app.route("/product-img/<path:filename>")
+    def product_image(filename):
+        return send_from_directory(SHARED_IMG_DIR, filename)
 
     # ---------------- EMAIL NOTIFIER ----------------
 
@@ -716,42 +785,46 @@ def create_app():
         g.event_type = "PRODUCT_CREATE_VIEW"
 
         if request.method == "POST":
-            name = request.form.get("name", "").strip()
-            category = request.form.get("category", "").strip()
-            stock_count = int(request.form.get("stock_count") or 0)
-            reorder_level = int(request.form.get("reorder_level") or 0)
-            unit_value = float(request.form.get("unit_value") or 0)
+            try:
+                name = request.form.get("name", "").strip()
+                category = request.form.get("category", "").strip()
+                stock_count = int(request.form.get("stock_count") or 0)
+                reorder_level = int(request.form.get("reorder_level") or 0)
+                unit_value = float(request.form.get("unit_value") or 0)
 
-            if not name or not category:
-                flash("Name and Category are required.")
+                if not name or not category:
+                    flash("Name and Category are required.")
+                    return render_template("product_form.html", product=None, categories=_load_categories())
+
+                prefix_map = {
+                    "electronics": "ELEC", "hardware": "HW", "raw material": "RAW",
+                    "packaging": "PKG", "consumables": "CONS", "furniture": "FURN",
+                    "textiles": "TEX", "food & beverage": "FNB",
+                }
+                prefix = prefix_map.get(category.lower(), "GEN")
+                all_skus = get_db().table("products").select("sku").execute()
+                existing_count = sum(
+                    1 for p in (all_skus.data or [])
+                    if p["sku"].startswith(f"{prefix}-")
+                )
+                sku = f"{prefix}-{existing_count + 1:03d}"
+
+                image_filename = _save_product_image(request.files.get("product_image"), sku)
+
+                get_db().table("products").insert({
+                    "sku": sku, "name": name, "category": category,
+                    "stock_count": stock_count, "reorder_level": reorder_level,
+                    "unit_value": unit_value, "price": unit_value,
+                    "description": "", "is_active": True,
+                    "image_url": image_filename,
+                }).execute()
+
+                audit("PRODUCT_CREATED", "inventory", sku, {"name": name, "category": category})
+                flash(f"Product '{name}' created. SKU: {sku}")
+                return redirect(url_for("inventory"))
+            except Exception as e:
+                flash(f"Failed to create product: {e}")
                 return render_template("product_form.html", product=None, categories=_load_categories())
-
-            prefix_map = {
-                "Electronics": "ELEC", "Hardware": "HW", "Raw Material": "RAW",
-                "Packaging": "PKG", "Consumables": "CONS", "Furniture": "FURN",
-                "Textiles": "TEX", "Food & Beverage": "FNB",
-            }
-            prefix = prefix_map.get(category, "GEN")
-            existing_count = (
-                get_db().table("products")
-                .select("id", count="exact")
-                .like("sku", f"{prefix}-%")
-                .execute().count or 0
-            )
-            sku = f"{prefix}-{existing_count + 1:03d}"
-
-            image_filename = _save_product_image(request.files.get("product_image"), sku)
-
-            get_db().table("products").insert({
-                "sku": sku, "name": name, "category": category,
-                "stock_count": stock_count, "reorder_level": reorder_level,
-                "unit_value": unit_value,
-                "image_url": image_filename,
-            }).execute()
-
-            audit("PRODUCT_CREATED", "inventory", sku, {"name": name, "category": category})
-            flash(f"Product '{name}' created. SKU: {sku}")
-            return redirect(url_for("inventory"))
 
         return render_template("product_form.html", product=None, categories=_load_categories())
 
@@ -770,31 +843,35 @@ def create_app():
         categories = _load_categories()
 
         if request.method == "POST":
-            name = request.form.get("name", "").strip()
-            category = request.form.get("category", "").strip()
-            stock_count = int(request.form.get("stock_count") or 0)
-            reorder_level = int(request.form.get("reorder_level") or 0)
-            unit_value = float(request.form.get("unit_value") or 0)
+            try:
+                name = request.form.get("name", "").strip()
+                category = request.form.get("category", "").strip()
+                stock_count = int(request.form.get("stock_count") or 0)
+                reorder_level = int(request.form.get("reorder_level") or 0)
+                unit_value = float(request.form.get("unit_value") or 0)
 
-            if not name:
-                flash("Name is required.")
+                if not name:
+                    flash("Name is required.")
+                    return render_template("product_form.html", product=product, categories=categories)
+
+                image_filename = _save_product_image(request.files.get("product_image"), sku)
+
+                update_data = {
+                    "name": name, "category": category,
+                    "stock_count": stock_count, "reorder_level": reorder_level,
+                    "unit_value": unit_value,
+                }
+                if image_filename:
+                    update_data["image_url"] = image_filename
+
+                get_db().table("products").update(update_data).eq("sku", sku).execute()
+
+                audit("PRODUCT_UPDATED", "inventory", sku, {"name": name})
+                flash(f"Product '{name}' updated.")
+                return redirect(url_for("inventory"))
+            except Exception as e:
+                flash(f"Failed to update product: {e}")
                 return render_template("product_form.html", product=product, categories=categories)
-
-            image_filename = _save_product_image(request.files.get("product_image"), sku)
-
-            update_data = {
-                "name": name, "category": category,
-                "stock_count": stock_count, "reorder_level": reorder_level,
-                "unit_value": unit_value,
-            }
-            if image_filename:
-                update_data["image_url"] = image_filename
-
-            get_db().table("products").update(update_data).eq("sku", sku).execute()
-
-            audit("PRODUCT_UPDATED", "inventory", sku, {"name": name})
-            flash(f"Product '{name}' updated.")
-            return redirect(url_for("inventory"))
 
         return render_template("product_form.html", product=product, categories=categories)
 
@@ -812,7 +889,8 @@ def create_app():
 
         # delete image file if exists
         if product.get("image_url"):
-            img_path = os.path.join(PRODUCT_IMG_DIR, product["image_url"])
+            img_filename = os.path.basename(product["image_url"])
+            img_path = os.path.join(PRODUCT_IMG_DIR, img_filename)
             if os.path.exists(img_path):
                 os.remove(img_path)
 
@@ -1580,20 +1658,24 @@ def create_app():
         if user_filter:
             query = query.eq("username", user_filter)
         if search:
-            query = query.or_(
-                f"details.ilike.%{search}%,affected_record.ilike.%{search}%"
+            s_lower = search.lower()
+            all_data = query.order("timestamp", desc=True).execute().data or []
+            filtered_data = [
+                row for row in all_data
+                if s_lower in (row.get("details") or "").lower() or s_lower in (row.get("affected_record") or "").lower()
+            ]
+            total = len(filtered_data)
+            logs = filtered_data[(page - 1) * per_page : page * per_page]
+        else:
+            total = query.count.execute().count if hasattr(query, 'count') else 0
+            logs = (
+                query.order("timestamp", desc=True)
+                .range((page - 1) * per_page, page * per_page - 1)
+                .execute()
+                .data or []
             )
 
-        total = query.count.execute().count if hasattr(query, 'count') else 0
         total_pages = max(1, (total // per_page) + (1 if total % per_page else 0))
-
-        logs = (
-            query
-            .order("timestamp", desc=True)
-            .range((page - 1) * per_page, page * per_page - 1)
-            .execute()
-            .data or []
-        )
 
         return render_template(
             "audit.html",
