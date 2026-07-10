@@ -1,0 +1,64 @@
+app:
+  name: anomaly
+
+services:
+  - name: sentinel-xdr
+    instance_type: nano
+    port: 5003
+    dockerfile: Dockerfile
+    command: gunicorn --bind 0.0.0.0:5003 --worker-class eventlet --workers 1 --timeout 120 "sentinel_xdr.app:app"
+    healthcheck:
+      path: /api/heartbeat
+    env:
+      - key: FLASK_SECRET_KEY
+        value: dev-secret
+      - key: SENTINEL_SHARED_SECRET
+        value: sentinel-secure-key-123
+      - key: ANOMALY_THRESHOLD
+        value: "0.85"
+      - key: BOLTMART_WEBHOOK
+        value: https://boltmart-anomaly.koyeb.app/api/defense_webhook
+      - key: WAREHOUSE_WEBHOOK
+        value: https://warehouse-os-anomaly.koyeb.app/api/defense_webhook
+      - key: BOLTMART_WEBHOOK_SECRET
+        value: boltmart-webhook-secret
+      - key: WAREHOUSE_WEBHOOK_SECRET
+        value: warehouse-webhook-secret
+      - key: SMTP_PORT
+        value: "587"
+
+  - name: boltmart
+    instance_type: nano
+    port: 5001
+    dockerfile: Dockerfile
+    command: gunicorn --bind 0.0.0.0:5001 --worker-class eventlet --workers 1 --timeout 120 "boltmart.app:create_app()"
+    healthcheck:
+      path: /health
+    env:
+      - key: FLASK_SECRET_KEY
+        value: dev-flask-secret
+      - key: SENTINEL_URL
+        value: https://sentinel-xdr-anomaly.koyeb.app/api/ingest
+      - key: SENTINEL_SHARED_SECRET
+        value: sentinel-secure-key-123
+      - key: APP_URL
+        value: https://boltmart-anomaly.koyeb.app
+      - key: SMTP_PORT
+        value: "587"
+
+  - name: warehouse-os
+    instance_type: nano
+    port: 5002
+    dockerfile: Dockerfile
+    command: gunicorn --bind 0.0.0.0:5002 --worker-class eventlet --workers 1 --timeout 120 "warehouse_os.app:app"
+    healthcheck:
+      path: /health
+    env:
+      - key: FLASK_SECRET_KEY
+        value: warehouseos-dev-secret
+      - key: SENTINEL_URL
+        value: https://sentinel-xdr-anomaly.koyeb.app/api/ingest
+      - key: SENTINEL_SHARED_SECRET
+        value: sentinel-secure-key-123
+      - key: SMTP_PORT
+        value: "587"
