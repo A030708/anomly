@@ -10,31 +10,31 @@
         <form method="POST" action="{{ url_for('checkout') }}" style="display: flex; flex-direction: column; gap: 32px;">
 
             {% if saved_addresses %}
-            <div style="background: var(--bm-surface); padding: 24px; border-radius: var(--bm-radius-lg); border: 1px solid var(--bm-border); border-top: 4px solid var(--bm-secondary);">
-                <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 16px; color: var(--bm-secondary);"><i class="fas fa-map-marker-alt"></i> Saved Addresses</h3>
+            <div class="bm-fieldset" style="border-top: 4px solid var(--bm-primary);">
+                <h3 style="font-weight: 700; font-size: 16px; margin-bottom: 16px; color: var(--bm-primary);"><i class="fas fa-map-marker-alt"></i> Saved Addresses</h3>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     {% for addr in saved_addresses %}
-                    <div style="padding: 12px; border: 1px solid var(--bm-border); border-radius: var(--bm-radius-md); cursor: pointer; transition: 0.2s;"
-                         onclick="fillAddress({{ addr|tojson|safe }})"
+                    <div class="addr-card" style="padding: 12px; border: 1px solid var(--bm-hairline); border-radius: var(--bm-radius-md); cursor: pointer; transition: 0.2s;"
+                         onclick="selectAddress(this, {{ addr|tojson|safe }})"
                          onmouseover="this.style.borderColor='var(--bm-primary)'"
-                         onmouseout="this.style.borderColor='var(--bm-border)'">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                         onmouseout="this.style.borderColor=this.dataset.selected ? '#166534' : 'var(--bm-hairline)'">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
                             <span class="bm-badge" style="background: var(--bm-primary); color: white; font-size: 11px;">{{ addr.label }}</span>
                             {% if addr.is_default %}
                             <span class="bm-badge" style="background: #166534; color: white; font-size: 11px;">Default</span>
                             {% endif %}
                         </div>
                         <p style="font-weight: 600; font-size: 14px;">{{ addr.name }}</p>
-                        <p style="font-size: 13px; color: var(--bm-text-muted);">{{ addr.address_line }}, {{ addr.city }}, {{ addr.state }} - {{ addr.pincode }}</p>
+                        <p style="font-size: 13px; color: var(--bm-muted); word-break: break-word;">{{ addr.address_line }}, {{ addr.city }}, {{ addr.state }} - {{ addr.pincode }}</p>
                     </div>
                     {% endfor %}
                 </div>
             </div>
             {% endif %}
 
-            <fieldset style="background: var(--bm-surface); padding: 32px; border-radius: var(--bm-radius-lg); border: 1px solid var(--bm-border); border-top: 4px solid var(--bm-primary); box-shadow: var(--bm-shadow-sm);">
+            <fieldset class="bm-fieldset" style="border-top: 4px solid var(--bm-primary);">
                 <legend style="font-weight: 800; font-size: 20px; padding: 0 8px; margin-bottom: 24px; color: var(--bm-primary);">Delivery Information</legend>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <div class="bm-form-grid">
                     <div>
                         <label class="bm-label">Full Name *</label>
                         <input type="text" name="name" id="addr_name" required placeholder="Rahul Sharma" class="bm-input" value="{{ g.customer.name if g.customer else '' }}">
@@ -43,13 +43,13 @@
                         <label class="bm-label">Mobile Number *</label>
                         <input type="tel" name="phone" id="addr_phone" required pattern="[0-9]{10}" placeholder="9876543210" class="bm-input" value="{{ g.customer.phone if g.customer else '' }}">
                     </div>
-                    <div style="grid-column: 1 / -1;">
+                    <div class="bm-form-full">
                         <label class="bm-label">Email *</label>
                         <input type="email" name="email" id="addr_email" required placeholder="rahul@example.com" class="bm-input" value="{{ g.customer.email if g.customer else '' }}" {% if g.customer %}readonly{% endif %}>
                     </div>
-                    <div style="grid-column: 1 / -1;">
+                    <div class="bm-form-full">
                         <label class="bm-label">Delivery Address *</label>
-                        <textarea name="address" id="addr_line" required rows="2" placeholder="Flat 4B, Sunrise Apartments, Near City Mall..." class="bm-input"></textarea>
+                        <textarea name="address" id="addr_line" required rows="2" placeholder="Flat 4B, Sunrise Apartments, Near City Mall..." class="bm-input" style="height: auto;"></textarea>
                     </div>
                     <div>
                         <label class="bm-label">City *</label>
@@ -66,7 +66,7 @@
                 </div>
             </fieldset>
 
-            <fieldset style="background: var(--bm-surface); padding: 32px; border-radius: var(--bm-radius-lg); border: 1px solid var(--bm-border); border-top: 4px solid #166534; box-shadow: var(--bm-shadow-sm);">
+            <fieldset class="bm-fieldset" style="border-top: 4px solid #166534;">
                 <legend style="font-weight: 800; font-size: 20px; padding: 0 8px; margin-bottom: 24px; color: #166534;">Payment Method</legend>
                 <div style="display: flex; flex-direction: column; gap: 16px;">
                     {% if error %}
@@ -76,33 +76,36 @@
                     {% endif %}
 
                     <!-- Pay Online (Razorpay) -->
-                    <label style="display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid var(--bm-border); border-radius: var(--bm-radius-md); cursor: pointer; transition: all 0.2s;">
-                        <input type="radio" name="payment_method" value="online" checked style="width: 20px; height: 20px; accent-color: #166534;">
+                    <label style="display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid var(--bm-hairline); border-radius: var(--bm-radius-md); cursor: pointer; transition: all 0.2s;">
+                        <input type="radio" name="payment_method" value="online" checked style="width: 20px; height: 20px; accent-color: #166534; flex-shrink: 0;">
                         <div>
                             <span style="font-weight: 700; font-size: 16px;">&#128179; Pay Online</span>
-                            <p style="font-size: 13px; color: var(--bm-text-muted); margin-top: 4px;">Cards, UPI, Net Banking, Wallet — powered by Razorpay</p>
+                            <p style="font-size: 13px; color: var(--bm-muted); margin-top: 4px;">Cards, UPI, Net Banking, Wallet — powered by Razorpay</p>
                         </div>
                     </label>
 
-                    <!-- Wallet (via Razorpay) -->
-                    <label style="display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid var(--bm-border); border-radius: var(--bm-radius-md); cursor: pointer; transition: all 0.2s;">
-                        <input type="radio" name="payment_method" value="wallet" style="width: 20px; height: 20px; accent-color: #166534;">
-                        <div>
-                            <span style="font-weight: 700; font-size: 16px;">&#128181; Wallet</span>
-                            <p style="font-size: 13px; color: var(--bm-text-muted); margin-top: 4px;">Paytm, Amazon Pay, MobiKwik via Razorpay</p>
-                        </div>
-                    </label>
                 </div>
             </fieldset>
 
-            <button type="submit" class="bm-btn" style="background-color: #166534; color: white; padding: 20px; font-size: 20px; width: 100%; box-shadow: 0 10px 25px -5px rgba(22, 101, 52, 0.4);">
+            <button type="submit" class="bm-btn" style="background-color: #166534; color: white; padding: 20px; font-size: 20px; width: 100%; box-shadow: 0 10px 25px -5px rgba(22, 101, 52, 0.4); height: auto;">
                 Place Order — &#8377;{{ "%.0f"|format(total) }}
             </button>
         </form>
     </div>
 
 <script>
-function fillAddress(addr) {
+let selectedAddrDiv = null;
+
+function selectAddress(el, addr) {
+    if (selectedAddrDiv) {
+        selectedAddrDiv.style.borderColor = 'var(--bm-hairline)';
+        selectedAddrDiv.dataset.selected = '';
+    }
+    el.style.borderColor = '#166534';
+    el.style.borderWidth = '2px';
+    el.dataset.selected = 'true';
+    selectedAddrDiv = el;
+
     document.getElementById('addr_name').value = addr.name || '';
     document.getElementById('addr_phone').value = addr.phone || '';
     document.getElementById('addr_line').value = addr.address_line || '';
@@ -110,19 +113,29 @@ function fillAddress(addr) {
     document.getElementById('addr_state').value = addr.state || '';
     document.getElementById('addr_pincode').value = addr.pincode || '';
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    {% if saved_addresses %}
+    var defaultAddr = {{ (saved_addresses|selectattr("is_default")|first or saved_addresses[0])|tojson|safe }};
+    var defaultEl = document.querySelector('.addr-card');
+    if (defaultAddr && defaultEl) {
+        selectAddress(defaultEl, defaultAddr);
+    }
+    {% endif %}
+});
 </script>
 
     <div>
-        <div style="background: var(--bm-surface); padding: 32px; border-radius: var(--bm-radius-lg); box-shadow: var(--bm-shadow-md); position: sticky; top: 100px;">
-            <h3 style="font-weight: 800; font-size: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--bm-border); padding-bottom: 16px;">Order Summary</h3>
+        <div class="bm-order-summary">
+            <h3 style="font-weight: 800; font-size: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--bm-hairline); padding-bottom: 16px;">Order Summary</h3>
             {% for item in cart %}
-            <div style="display: flex; justify-content: space-between; font-size: 14px; padding: 12px 0; border-bottom: 1px solid var(--bm-border);">
-                <span style="color: var(--bm-text-main);">{{ item.name }} &times; {{ item.quantity }}</span>
-                <span style="font-weight: 600;">&#8377;{{ "%.0f"|format(item.price * item.quantity) }}</span>
+            <div style="display: flex; justify-content: space-between; font-size: 14px; padding: 12px 0; border-bottom: 1px solid var(--bm-hairline);">
+                <span style="color: var(--bm-body); word-break: break-word; margin-right: 8px;">{{ item.name }} &times; {{ item.quantity }}</span>
+                <span style="font-weight: 600; white-space: nowrap;">&#8377;{{ "%.0f"|format(item.price * item.quantity) }}</span>
             </div>
             {% endfor %}
             <!-- Coupon Code -->
-            <div style="padding: 16px 0; border-top: 1px solid var(--bm-border);">
+            <div style="padding: 16px 0; border-top: 1px solid var(--bm-hairline);">
                 <form method="POST" action="{{ url_for('checkout') }}" style="display: flex; gap: 8px;">
                     <input type="hidden" name="action" value="apply_coupon">
                     <input type="text" name="coupon_code" value="{{ coupon_code or '' }}" class="bm-input" placeholder="Coupon code" style="flex: 1; padding: 8px; font-size: 13px; text-transform: uppercase;">
@@ -138,11 +151,11 @@ function fillAddress(addr) {
 
             <div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px;">
                 <div style="display: flex; justify-content: space-between;">
-                    <span style="color: var(--bm-text-muted);">Subtotal</span>
+                    <span style="color: var(--bm-muted);">Subtotal</span>
                     <span style="font-weight: 600;">&#8377;{{ "%.0f"|format(subtotal) }}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
-                    <span style="color: var(--bm-text-muted);">Delivery</span>
+                    <span style="color: var(--bm-muted);">Delivery</span>
                     <span class="{% if delivery_charge == 0 %}bm-badge bm-badge-stock{% endif %}" style="font-weight: 600;">
                         {% if delivery_charge == 0 %}FREE{% else %}&#8377;{{ "%.0f"|format(delivery_charge) }}{% endif %}
                     </span>
@@ -153,7 +166,7 @@ function fillAddress(addr) {
                     <span style="font-weight: 700;">-&#8377;{{ "%.0f"|format(coupon_discount) }}</span>
                 </div>
                 {% endif %}
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--bm-border); padding-top: 24px; margin-top: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--bm-hairline); padding-top: 24px; margin-top: 12px;">
                     <span style="font-size: 18px; font-weight: 700;">Total</span>
                     <span style="font-size: 24px; font-weight: 800; color: #166534;">&#8377;{{ "%.0f"|format(total) }}</span>
                 </div>

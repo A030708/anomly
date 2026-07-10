@@ -11,7 +11,7 @@ class Config:
     SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
     SENTINEL_URL = os.getenv("SENTINEL_URL", "http://127.0.0.1:5003/api/ingest")
-    SENTINEL_SHARED_SECRET = os.getenv("SENTINEL_SHARED_SECRET", "sentinel-secure-key-123")
+    SENTINEL_SHARED_SECRET = os.getenv("SENTINEL_SHARED_SECRET", "sentinel-xdr-shared-secret-2024")
 
     SESSION_COOKIE_NAME = "warehouseos_session"
 

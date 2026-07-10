@@ -565,20 +565,18 @@ def get_audit_logs(limit=50):
         .execute()
     )
 
-    level_map = {True: "critical", False: "info"}
-    status_map = {True: "failure", False: "success"}
-
     logs = []
     for e in data_resp.data or []:
-        is_ano = e.get("is_anomalous", False)
+        etype = (e.get("event_type") or "").upper()
+        is_failure = "FAIL" in etype or "REJECT" in etype or "ERROR" in etype
         logs.append({
             "timestamp": _parse_iso(e.get("created_at")),
             "user": e.get("user_id") or "system",
             "action": e.get("event_type", "unknown"),
             "resource": e.get("route", "N/A"),
             "ip_address": e.get("ip_address", "127.0.0.1"),
-            "status": status_map.get(is_ano, "success"),
-            "level": level_map.get(is_ano, "info"),
+            "status": "failure" if is_failure else "success",
+            "level": "critical" if is_failure else "info",
             "request_id": e.get("event_id", "N/A"),
             "user_agent": json.dumps(e.get("metadata", {}).get("user_agent", "SentinelXDR/1.0")),
             "changes": e.get("metadata", {}).get("reason", "No details"),

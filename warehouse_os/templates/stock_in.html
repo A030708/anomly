@@ -6,25 +6,17 @@
 <h1 class="wos-page-title" style="margin-bottom: 8px;">Stock Receiving</h1>
 <p style="color: var(--wos-text-muted); margin-bottom: 24px;">Add incoming stock to the warehouse inventory.</p>
 
-{% if selected_po %}
-<div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--wos-radius-md); padding: 16px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
-  <div>
-    <strong style="color: #1e40af;">Receiving Against PO: {{ selected_po.po_number }}</strong>
-    <span style="color: #64748b; font-size: 13px; margin-left: 12px;">Total: ₹{{ "%.0f"|format(selected_po.total_value or 0) }}</span>
-  </div>
-  <a href="{{ url_for('stock_in') }}" style="color: #3b82f6; font-size: 13px; text-decoration: none;"><i class="fa-solid fa-xmark"></i> Clear PO</a>
+<div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--wos-radius-md); padding: 16px 20px; margin-bottom: 24px;">
+  <strong style="color: #1e40af;">Receiving Against PO: {{ selected_po.po_number }}</strong>
+  <span style="color: #64748b; font-size: 13px; margin-left: 12px;">Total: ₹{{ "%.0f"|format(selected_po.total_value or 0) }}</span>
 </div>
-{% endif %}
 
 <div style="max-width: 800px;">
   <form method="POST" class="wos-card" style="padding: 24px; margin-bottom: 32px; display: flex; flex-direction: column; gap: 16px;">
-    {% if selected_po %}
     <input type="hidden" name="po_id" value="{{ selected_po.id }}">
-    {% endif %}
 
     <div>
       <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Product (SKU)</label>
-      {% if po_items %}
       <select name="sku" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
         {% for item in po_items %}
         {% set p = products|selectattr("sku", "equalto", item.sku)|first %}
@@ -32,31 +24,17 @@
           {{ item.sku }} — {{ p.name if p else item.sku }} (Ordered: {{ item.ordered_qty }}, Received: {{ item.received_qty }})
         </option>
         {% endfor %}
-        <option value="" disabled>──────────</option>
-        <option value="other">Other product (not in PO)</option>
       </select>
-      {% else %}
-      <select name="sku" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
-        {% for product in products %}
-        <option value="{{ product.sku }}" data-stock="{{ product.stock_count }}" data-reorder="{{ product.reorder_level }}">
-          {{ product.sku }} — {{ product.name }} (Current: {{ product.stock_count }})
-        </option>
-        {% endfor %}
-      </select>
-      {% endif %}
     </div>
 
-    {% if po_items %}
     <div>
       <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">PO Item</label>
-      <select name="po_item_id" style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
+      <select name="po_item_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--wos-border); border-radius: var(--wos-radius-md); background: white; font-family: inherit; font-size: 14px; outline: none;">
         {% for item in po_items %}
         <option value="{{ item.id }}">{{ item.sku }} — Ordered {{ item.ordered_qty }}, Received {{ item.received_qty }}</option>
         {% endfor %}
-        <option value="">Not in PO</option>
       </select>
     </div>
-    {% endif %}
 
     <div>
       <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">Quantity Received</label>

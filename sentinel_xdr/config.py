@@ -9,7 +9,7 @@ class Config:
 
     SENTINEL_SHARED_SECRET = os.getenv(
         "SENTINEL_SHARED_SECRET",
-        "dev-sentinel-secret-change-later"
+        "sentinel-xdr-shared-secret-2024"
     )
 
     ANOMALY_THRESHOLD = float(os.getenv("ANOMALY_THRESHOLD", "0.85"))

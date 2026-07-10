@@ -57,13 +57,13 @@
     }
     .raw-log-expand {
         display: none;
-        background: rgba(0,0,0,0.3);
-        border: 1px solid rgba(255,255,255,0.06);
+        background: #1e1e2f;
+        border: 1px solid rgba(0,212,255,0.2);
         border-radius: 6px;
         padding: 12px;
         font-family: monospace;
         font-size: 11px;
-        color: var(--text-secondary);
+        color: #00d4ff;
         margin-top: 6px;
         max-height: 200px;
         overflow: auto;
@@ -79,7 +79,7 @@
         cursor: pointer;
         padding: 0;
     }
-    .toggle-raw:hover { color: #00d4ff; }
+
     .event-type-badge {
         padding: 3px 10px;
         border-radius: 20px;
@@ -135,10 +135,6 @@
         <option value="">All Types</option>
         <option value="authentication">Authentication</option>
         <option value="network">Network</option>
-        <option value="file">File</option>
-        <option value="process">Process</option>
-        <option value="system">System</option>
-        <option value="registry">Registry</option>
     </select>
     <select class="filter-select" id="sourceFilter">
         <option value="">All Sources</option>
@@ -196,7 +192,8 @@
                 {% if events %}
                     {% for event in events %}
                     <tr data-type="{{ event.event_type|lower }}"
-                        data-source="{{ event.source|lower }}">
+                        data-source="{{ event.source|lower }}"
+                        data-time="{{ event.created_at.isoformat() if event.created_at else '' }}">
                         <td class="local-time" data-utc="{{ event.created_at.isoformat() if event.created_at else '' }}" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">
                             {{ event.created_at.strftime('%Y-%m-%d %H:%M:%S') if event.created_at else 'N/A' }}
                         </td>
@@ -278,16 +275,25 @@ function applyFilters() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const type = document.getElementById('typeFilter').value.toLowerCase();
     const source = document.getElementById('sourceFilter').value.toLowerCase();
+    const timeVal = document.getElementById('timeFilter').value;
     const rows = document.querySelectorAll('#eventsBody tr[data-type]');
     let visible = 0;
+
+    const now = new Date();
+    const timeCutoffs = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000, '30d': 2592000000 };
+    const cutoff = timeCutoffs[timeVal] || 0;
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const matchSearch = !search || text.includes(search);
         const matchType = !type || row.dataset.type === type;
         const matchSource = !source || row.dataset.source === source;
+        let matchTime = true;
+        if (cutoff && row.dataset.time) {
+            matchTime = (now - new Date(row.dataset.time)) <= cutoff;
+        }
 
-        if (matchSearch && matchType && matchSource) {
+        if (matchSearch && matchType && matchSource && matchTime) {
             row.style.display = '';
             visible++;
         } else {
@@ -299,9 +305,10 @@ function applyFilters() {
 document.getElementById('searchInput').addEventListener('input', applyFilters);
 document.getElementById('typeFilter').addEventListener('change', applyFilters);
 document.getElementById('sourceFilter').addEventListener('change', applyFilters);
+document.getElementById('timeFilter').addEventListener('change', applyFilters);
 
 function exportEvents() {
-    alert('Export events to CSV/JSON - implement server-side');
+    window.location.href = '{{ url_for("events.export_events") }}';
 }
 
 function refreshEvents() {

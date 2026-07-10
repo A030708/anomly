@@ -7,16 +7,16 @@
 {% block extra_css %}
 <style>
     .compliance-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; height: 100%; transition: all 0.2s; }
-    .compliance-card:hover { background: var(--bg-card-hover); border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+
     .framework-badge { padding: 3px 10px; border-radius: 5px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; }
     .control-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; }
     .control-row:last-child { border-bottom: none; }
-    .control-row:hover { background: rgba(255,255,255,0.02); }
+
     .status-pill { padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; }
     .tabs-nav { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.07); }
     .tab-pill { padding: 9px 18px; background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
     .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
-    .tab-pill:hover { color: var(--text-primary); }
+
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     .filter-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
@@ -25,7 +25,7 @@
     .filter-input:focus { border-color: #00d4ff; }
     .compliance-gauge { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; flex-shrink: 0; }
     .evidence-file { display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s; }
-    .evidence-file:hover { background: rgba(255,255,255,0.06); border-color: rgba(0,212,255,0.2); }
+
 </style>
 {% endblock %}
 

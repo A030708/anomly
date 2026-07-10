@@ -2,12 +2,12 @@
 {% block title %}Pay - BoltMart{% endblock %}
 {% block content %}
 
-<div style="max-width: 500px; margin: 60px auto; text-align: center;">
+<div class="bm-payment-card">
     <div class="bm-card" style="padding: 40px;">
 
         <div style="font-size: 48px; margin-bottom: 16px;">&#128179;</div>
         <h2 style="margin-top: 0; color: var(--bm-primary);">Complete Payment</h2>
-        <p style="color: var(--bm-text-muted); margin-bottom: 24px;">
+        <p style="color: var(--bm-muted); margin-bottom: 24px;">
             Order: <strong>{{ order.order_id }}</strong>
         </p>
 
@@ -74,11 +74,11 @@
         </a>
         {% endif %}
 
-        <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--bm-border);">
-            <p style="font-size: 13px; color: var(--bm-text-muted);">
+        <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--bm-hairline);">
+            <p style="font-size: 13px; color: var(--bm-muted);">
                 <i class="fas fa-lock"></i> Secured by Razorpay
             </p>
-            <p style="font-size: 12px; color: var(--bm-text-muted); margin-top: 4px;">
+            <p style="font-size: 12px; color: var(--bm-muted); margin-top: 4px;">
                 Your payment information is securely processed.
             </p>
         </div>

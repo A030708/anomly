@@ -8,7 +8,7 @@
 <div class="bm-glass-panel" style="text-align: center; padding: 64px 32px;">
     <div style="font-size: 64px; margin-bottom: 16px;">&#128722;</div>
     <h2 class="bm-page-title" style="font-size: 24px;">Your cart is empty</h2>
-    <p style="color: var(--bm-text-muted); margin-bottom: 32px;">Start shopping to fill your cart!</p>
+    <p style="color: var(--bm-muted); margin-bottom: 32px;">Start shopping to fill your cart!</p>
     <a href="{{ url_for('shop') }}" class="bm-btn bm-btn-primary">
         Continue Shopping
     </a>
@@ -20,22 +20,22 @@
 
     <div style="display: flex; flex-direction: column; gap: 16px;">
         {% for item in cart %}
-        <div style="background: var(--bm-surface); padding: 16px; border-radius: var(--bm-radius-md); border: 1px solid var(--bm-border); display: flex; align-items: center; gap: 16px;">
-            <div style="width: 80px; height: 80px; border-radius: var(--bm-radius-sm); overflow: hidden; background: #f1f5f9; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+        <div class="bm-cart-item">
+            <div class="bm-cart-item-thumb">
                 {% if item.image_url %}
-                <img src="{{ item.image_url }}" alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                <img src="{{ item.image_url }}" alt="{{ item.name }}">
                 {% else %}
                 <span style="font-size: 24px;">&#128295;</span>
                 {% endif %}
             </div>
 
-            <div style="flex-grow: 1;">
+            <div class="bm-cart-item-info">
                 <h3 style="font-weight: 700; margin-bottom: 4px;">{{ item.name }}</h3>
-                <p style="font-size: 13px; color: var(--bm-text-muted);">SKU: {{ item.sku }}</p>
-                <p style="font-size: 13px; color: var(--bm-text-muted);">&#8377;{{ "%.0f"|format(item.price) }} each</p>
+                <p style="font-size: 13px; color: var(--bm-muted);">SKU: {{ item.sku }}</p>
+                <p style="font-size: 13px; color: var(--bm-muted);">&#8377;{{ "%.0f"|format(item.price) }} each</p>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="bm-cart-item-qty">
                 <form method="POST" action="{{ url_for('update_cart') }}" style="display: inline;">
                     <input type="hidden" name="sku" value="{{ item.sku }}">
                     <input type="hidden" name="action" value="decrement">
@@ -51,7 +51,7 @@
                 </form>
             </div>
 
-            <div style="font-weight: 800; font-size: 18px; min-width: 80px; text-align: right; color: var(--bm-primary);">
+            <div class="bm-cart-item-price">
                 &#8377;{{ "%.0f"|format(item.price * item.quantity) }}
             </div>
 
@@ -63,15 +63,15 @@
         {% endfor %}
     </div>
 
-    <div style="background: var(--bm-surface); padding: 32px; border-radius: var(--bm-radius-lg); box-shadow: var(--bm-shadow-md); position: sticky; top: 100px;">
-        <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--bm-border);">Order Summary</h2>
+    <div class="bm-order-summary">
+        <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--bm-hairline);">Order Summary</h2>
         <div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px; margin-bottom: 24px;">
             <div style="display: flex; justify-content: space-between;">
-                <span style="color: var(--bm-text-muted);">Subtotal ({{ cart|sum(attribute='quantity') }} items)</span>
+                <span style="color: var(--bm-muted);">Subtotal ({{ cart|sum(attribute='quantity') }} items)</span>
                 <span style="font-weight: 600;">&#8377;{{ "%.0f"|format(subtotal) }}</span>
             </div>
             <div style="display: flex; justify-content: space-between;">
-                <span style="color: var(--bm-text-muted);">Delivery</span>
+                <span style="color: var(--bm-muted);">Delivery</span>
                 <span class="{% if delivery_charge == 0 %}bm-badge bm-badge-stock{% endif %}" style="font-weight: 600;">
                     {% if delivery_charge == 0 %}FREE{% else %}&#8377;{{ "%.0f"|format(delivery_charge) }}{% endif %}
                 </span>
@@ -80,7 +80,7 @@
                 <p style="font-size: 12px; color: #166534; margin-top: 8px;">&#10003; Free delivery on orders above &#8377;2,000</p>
             {% endif %}
         </div>
-        <div style="border-top: 1px solid var(--bm-border); padding-top: 24px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="border-top: 1px solid var(--bm-hairline); padding-top: 24px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 18px; font-weight: 700;">Total</span>
             <span style="font-size: 24px; font-weight: 800; color: #166534;">&#8377;{{ "%.0f"|format(total) }}</span>
         </div>

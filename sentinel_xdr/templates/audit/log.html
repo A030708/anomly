@@ -30,11 +30,7 @@
     .audit-input::placeholder { color: rgba(255,255,255,0.35); }
     .audit-select option { background: #1a2035; }
     .log-row {
-        transition: background 0.15s;
         border-left: 3px solid transparent;
-    }
-    .log-row:hover td {
-        background: rgba(255,255,255,0.02);
     }
     .log-row.critical { border-left-color: #ff4757; }
     .log-row.warning  { border-left-color: #ffd700; }
@@ -49,11 +45,11 @@
         letter-spacing: 0.5px;
     }
     .action-login    { background:rgba(0,212,255,0.12); color:#00d4ff; }
-    .action-config   { background:rgba(168,85,247,0.12);color:#a855f7; }
-    .action-delete   { background:rgba(255,71,87,0.12);  color:#ff4757; }
-    .action-export   { background:rgba(255,215,0,0.12);  color:#ffd700; }
-    .action-create   { background:rgba(0,255,136,0.12);  color:#00ff88; }
-    .action-update   { background:rgba(255,107,53,0.12); color:#ff6b35; }
+    .action-config   { background:rgba(0,212,255,0.12); color:#00d4ff; }
+    .action-delete   { background:rgba(0,212,255,0.12); color:#00d4ff; }
+    .action-export   { background:rgba(0,212,255,0.12); color:#00d4ff; }
+    .action-create   { background:rgba(0,212,255,0.12); color:#00d4ff; }
+    .action-update   { background:rgba(0,212,255,0.12); color:#00d4ff; }
     .status-badge {
         padding: 3px 8px;
         border-radius: 4px;
@@ -69,13 +65,13 @@
     }
     .log-details-expand {
         display: none;
-        background: rgba(0,0,0,0.2);
-        border: 1px solid rgba(255,255,255,0.06);
+        background: #1e1e2f;
+        border: 1px solid rgba(0,212,255,0.2);
         border-radius: 6px;
         padding: 10px;
         margin-top: 8px;
         font-size: 11px;
-        color: var(--text-muted);
+        color: #e2e8f0;
         font-family: monospace;
         white-space: pre-wrap;
     }
@@ -89,7 +85,7 @@
         padding: 2px 6px;
         border-radius: 4px;
     }
-    .expand-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+
     .timeline-chart-card {
         background: var(--bg-card);
         border: 1px solid var(--border-color);
@@ -154,10 +150,12 @@
     <select class="audit-select" id="actionFilter">
         <option value="">All Actions</option>
         <option value="login">Login</option>
-        <option value="config">Config Change</option>
-        <option value="delete">Delete</option>
-        <option value="create">Create</option>
+        <option value="order">Order</option>
+        <option value="checkout">Checkout</option>
         <option value="export">Export</option>
+        <option value="honeypot">Honeypot</option>
+        <option value="write">Write-off</option>
+        <option value="config">Config</option>
     </select>
     <select class="audit-select" id="statusFilter">
         <option value="">All Statuses</option>
@@ -312,7 +310,7 @@ function applyFilters() {
         const rowStatus = row.dataset.status;
 
         const matchSearch = !search || text.includes(search);
-        const matchAction = !action || rowAction === action;
+        const matchAction = !action || rowAction.includes(action);
         const matchStatus = !status || rowStatus === status;
 
         if (matchSearch && matchAction && matchStatus) {
@@ -330,7 +328,7 @@ document.getElementById('actionFilter').addEventListener('change', applyFilters)
 document.getElementById('statusFilter').addEventListener('change', applyFilters);
 
 function exportLogs() {
-    alert('Exporting audit logs to CSV/JSON...');
+    window.location.href = '{{ url_for("audit.export_audit") }}';
 }
 
 // Audit Timeline Chart

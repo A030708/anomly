@@ -38,9 +38,7 @@
                 <i class="fa-solid fa-box"></i> Inventory
             </a>
             {% if current_user.role in ['admin', 'manager'] %}
-            <a href="{{ url_for('stock_in') }}" class="wos-nav-link {% if request.endpoint == 'stock_in' %}active{% endif %}">
-                <i class="fa-solid fa-arrow-down"></i> Stock Receiving
-            </a>
+
             {% endif %}
             <a href="{{ url_for('inventory_movements') }}" class="wos-nav-link {% if request.endpoint == 'inventory_movements' %}active{% endif %}">
                 <i class="fa-solid fa-arrows-spin"></i> Movements
@@ -106,7 +104,6 @@
             <div style="font-weight: 600; color: var(--wos-secondary); font-size: 15px;">
                 {% block header_title %}Overview{% endblock %}
             </div>
-            <div></div>
         </header>
         {% endif %}
         

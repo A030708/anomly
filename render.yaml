@@ -1,0 +1,110 @@
+services:
+  - type: web
+    name: sentinel-xdr
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/YOUR_REPO
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerCommand: gunicorn --bind 0.0.0.0:5003 --worker-class eventlet --workers 1 --timeout 120 "sentinel_xdr.app:app"
+    healthCheckPath: /api/heartbeat
+    envVars:
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SENTINEL_SHARED_SECRET
+        sync: false
+      - key: ANOMALY_THRESHOLD
+        value: "0.85"
+      - key: BOLTMART_WEBHOOK
+        value: https://boltmart.onrender.com/api/defense_webhook
+      - key: WAREHOUSE_WEBHOOK
+        value: https://warehouse-os.onrender.com/api/defense_webhook
+      - key: BOLTMART_WEBHOOK_SECRET
+        sync: false
+      - key: WAREHOUSE_WEBHOOK_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+
+  - type: web
+    name: boltmart
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/YOUR_REPO
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerCommand: gunicorn --bind 0.0.0.0:5001 --worker-class eventlet --workers 1 --timeout 120 "boltmart.app:create_app()"
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SENTINEL_URL
+        value: https://sentinel-xdr.onrender.com/api/ingest
+      - key: SENTINEL_SHARED_SECRET
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: APP_URL
+        value: https://boltmart.onrender.com
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+
+  - type: web
+    name: warehouse-os
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/YOUR_REPO
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerCommand: gunicorn --bind 0.0.0.0:5002 --worker-class eventlet --workers 1 --timeout 120 "warehouse_os.app:app"
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SENTINEL_URL
+        value: https://sentinel-xdr.onrender.com/api/ingest
+      - key: SENTINEL_SHARED_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false

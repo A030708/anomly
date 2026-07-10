@@ -5,7 +5,7 @@
   "retention_period": "90 days",
   "session_timeout": "1",
   "max_login_attempts": "5",
-  "password_policy": "Enhanced",
+  "password_policy": "Strict",
   "event_collection": true,
   "network_flow_collection": true,
   "endpoint_telemetry": true,

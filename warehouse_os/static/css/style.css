@@ -117,12 +117,6 @@ body {
   font-size: 14px;
   font-weight: 500;
   border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.wos-nav-link:hover {
-  color: white;
-  background: rgba(255,255,255,0.08);
 }
 
 .wos-nav-link.active {
@@ -149,10 +143,7 @@ body {
   border-radius: var(--wos-radius-lg);
   box-shadow: var(--wos-shadow-sm);
   border: 1px solid var(--wos-border);
-  transition: box-shadow 0.2s ease;
 }
-
-.wos-card:hover { box-shadow: var(--wos-shadow-md); }
 
 .wos-page-title {
   font-size: 22px;
@@ -172,7 +163,6 @@ body {
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s ease;
   border: none;
   text-decoration: none;
   gap: 8px;
@@ -180,16 +170,12 @@ body {
 }
 
 .wos-btn-primary { background: var(--wos-accent-gradient); color: white; box-shadow: 0 2px 8px rgba(59,130,246,0.25); }
-.wos-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(59,130,246,0.35); }
 
 .wos-btn-secondary { background: white; color: var(--wos-text-main); border: 1px solid var(--wos-border); }
-.wos-btn-secondary:hover { background: var(--wos-surface-hover); border-color: #cbd5e1; }
 
 .wos-btn-success { background: var(--wos-success); color: white; }
-.wos-btn-success:hover { background: #15803d; transform: translateY(-1px); }
 
 .wos-btn-danger { background: var(--wos-danger); color: white; }
-.wos-btn-danger:hover { background: #b91c1c; transform: translateY(-1px); }
 
 /* ============ TABLES ============ */
 .wos-table-wrapper {
@@ -223,11 +209,8 @@ body {
   font-size: 13px;
 }
 
-.wos-table tbody tr { transition: background 0.15s; }
 .wos-table tbody tr:last-child td { border-bottom: none; }
-.wos-table tbody tr:hover { background: var(--wos-surface-hover); }
 .wos-table tbody tr:nth-child(even) { background: #fafbfc; }
-.wos-table tbody tr:nth-child(even):hover { background: var(--wos-surface-hover); }
 
 /* ============ BADGES ============ */
 .wos-badge {
@@ -264,12 +247,6 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: all 0.2s ease;
-}
-
-.wos-stat-card:hover {
-  box-shadow: var(--wos-shadow-md);
-  transform: translateY(-2px);
 }
 
 .wos-stat-icon {
@@ -381,13 +358,11 @@ body {
   text-decoration: none;
   color: var(--wos-text-muted);
   border-radius: var(--wos-radius-md) var(--wos-radius-md) 0 0;
-  transition: all 0.2s;
   border: none;
   cursor: pointer;
   background: transparent;
 }
 
-.wos-tab:hover { color: var(--wos-text-main); background: var(--wos-bg); }
 .wos-tab.active { color: var(--wos-accent); background: white; box-shadow: inset 0 -2px 0 var(--wos-accent); }
 
 /* ============ UTILITY ============ */
@@ -439,10 +414,8 @@ body {
   border-radius: var(--wos-radius-md);
   font-size: 12px;
   font-weight: 600;
-  transition: transform 0.2s;
 }
 
-.wos-order-seg:hover { transform: translateY(-2px); }
 .wos-order-seg strong { font-size: 20px; display: block; margin-bottom: 4px; }
 
 /* ============ LOGIN PAGE ============ */
@@ -483,4 +456,3 @@ body {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }

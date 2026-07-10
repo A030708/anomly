@@ -1,6 +1,8 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 
 from sentinel_xdr.database import get_alerts_page, get_alert_stats, get_alert_detail
+from sentinel_xdr.feedback import save_feedback, get_feedback_for_event, get_training_data, needs_retrain
+from sentinel_xdr.anomaly_detector import AnomalyDetector
 
 alerts_bp = Blueprint("alerts", __name__, url_prefix="/alerts")
 
@@ -19,7 +21,30 @@ def alert_detail(alert_id):
     if not alert:
         flash(f"Alert {alert_id} not found", "danger")
         return redirect(url_for("alerts.list_alerts"))
-    return render_template("alerts/detail.html", alert=alert, related_alerts=[])
+    feedback = get_feedback_for_event(alert["id"])
+    return render_template("alerts/detail.html", alert=alert, related_alerts=[], feedback=feedback)
+
+
+@alerts_bp.route("/<alert_id>/feedback", methods=["POST"])
+def submit_feedback(alert_id):
+    data = request.get_json(silent=True) or {}
+    is_fp = data.get("is_false_positive", False)
+    notes = data.get("notes", "")
+
+    save_feedback(alert_id, is_fp, notes)
+
+    if needs_retrain():
+        try:
+            result = get_training_data()
+            if result:
+                vectors, labels = result
+                detector = AnomalyDetector()
+                detector.retrain(vectors, labels)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("Retrain failed: %s", e)
+
+    return jsonify({"success": True, "is_false_positive": is_fp})
 
 
 @alerts_bp.route("/<alert_id>/resolve")

@@ -1,0 +1,96 @@
+services:
+
+  sentinel-xdr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentinel-xdr
+    ports:
+      - "5003:5003"
+    environment:
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-dev-secret}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SENTINEL_SHARED_SECRET=${SENTINEL_SHARED_SECRET:-sentinel-xdr-shared-secret-2024}
+      - ANOMALY_THRESHOLD=${ANOMALY_THRESHOLD:-0.85}
+      - BOLTMART_WEBHOOK=http://boltmart:5001/api/defense_webhook
+      - WAREHOUSE_WEBHOOK=http://warehouse-os:5002/api/defense_webhook
+      - BOLTMART_WEBHOOK_SECRET=${BOLTMART_WEBHOOK_SECRET:-boltmart-webhook-secret}
+      - WAREHOUSE_WEBHOOK_SECRET=${WAREHOUSE_WEBHOOK_SECRET:-warehouse-webhook-secret}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-sentinel@boltmart.in}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+    command: >
+      gunicorn --bind 0.0.0.0:5003 --worker-class eventlet --workers 1
+      --timeout 120 "sentinel_xdr.app:app"
+    restart: unless-stopped
+    networks:
+      - anomaly-net
+
+  boltmart:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: boltmart
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-boltmart-dev-secret}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SENTINEL_URL=http://sentinel-xdr:5003/api/ingest
+      - SENTINEL_SHARED_SECRET=${SENTINEL_SHARED_SECRET:-sentinel-xdr-shared-secret-2024}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
+      - APP_URL=http://localhost:5001
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+    command: >
+      gunicorn --bind 0.0.0.0:5001 --worker-class eventlet --workers 1
+      --timeout 120 "boltmart.app:create_app()"
+    depends_on:
+      sentinel-xdr:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - anomaly-net
+
+  warehouse-os:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: warehouse-os
+    ports:
+      - "5002:5002"
+    environment:
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-warehouseos-dev-secret}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SENTINEL_URL=http://sentinel-xdr:5003/api/ingest
+      - SENTINEL_SHARED_SECRET=${SENTINEL_SHARED_SECRET:-sentinel-xdr-shared-secret-2024}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+    command: >
+      gunicorn --bind 0.0.0.0:5002 --worker-class eventlet --workers 1
+      --timeout 120 "warehouse_os.app:app"
+    depends_on:
+      sentinel-xdr:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - anomaly-net
+
+networks:
+  anomaly-net:
+    driver: bridge

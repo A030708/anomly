@@ -7,7 +7,7 @@
 {% block extra_css %}
 <style>
     .hunt-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; height: 100%; transition: all 0.2s; }
-    .hunt-card:hover { background: var(--bg-card-hover); border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+    
     .filter-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 13px; outline: none; }
     .filter-input:focus { border-color: #00d4ff; }
     .filter-input::placeholder { color: rgba(255,255,255,0.35); }
@@ -32,7 +32,7 @@
         transition: all 0.2s;
     }
     .tab-pill.active { color: #00d4ff; border-bottom-color: #00d4ff; }
-    .tab-pill:hover { color: var(--text-primary); }
+    
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     .query-editor { background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 14px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.6; color: #e2e8f0; min-height: 160px; outline: none; width: 100%; resize: vertical; tab-size: 2; }
@@ -60,7 +60,7 @@
         transition: all 0.2s;
         font-size: 12px;
     }
-    .template-item:hover { background: rgba(0,212,255,0.06); border-color: rgba(0,212,255,0.2); }
+    
     .template-item .template-name { font-weight: 600; color: var(--text-primary); }
     .template-item .template-desc { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
     .hypothesis-card {
@@ -71,7 +71,7 @@
         margin-bottom: 12px;
         transition: all 0.2s;
     }
-    .hypothesis-card:hover { border-color: rgba(0,212,255,0.2); }
+    
     .hypothesis-card.active-hunt { border-color: rgba(0,255,136,0.3); border-left: 3px solid #00ff88; }
     .hypothesis-card.completed-hunt { border-color: rgba(100,116,139,0.2); opacity: 0.7; }
     .ttp-chip {
@@ -109,7 +109,7 @@
     }
     .data-source-chip.selected { border-color: #00d4ff; background: rgba(0,212,255,0.08); color: #00d4ff; }
     .schedule-btn { padding: 4px 10px; font-size: 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); border-radius: 6px; cursor: pointer; }
-    .schedule-btn:hover { background: rgba(255,255,255,0.08); }
+    
 </style>
 {% endblock %}
 

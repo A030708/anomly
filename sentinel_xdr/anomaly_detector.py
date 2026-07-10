@@ -34,6 +34,45 @@ class AnomalyDetector:
 
         self._train_baseline()
 
+    def retrain(self, feature_vectors, labels=None):
+        """Retrain the model on real data (optionally with feedback labels).
+
+        Args:
+            feature_vectors: list of np.ndarray feature vectors
+            labels: optional list of 0 (normal) / 1 (anomalous) labels
+        """
+        import numpy as np
+        from sklearn.ensemble import IsolationForest
+        from sklearn.preprocessing import StandardScaler
+
+        X = np.array(feature_vectors)
+        logger.info("Retraining anomaly detector on %d real samples...", len(X))
+
+        self.scaler = StandardScaler()
+        X_scaled = self.scaler.fit_transform(X)
+
+        if labels is not None and len(set(labels)) > 1:
+            contamination = sum(labels) / len(labels)
+            contamination = max(0.01, min(contamination, 0.5))
+        else:
+            contamination = 0.05
+
+        self.model = IsolationForest(
+            n_estimators=200,
+            contamination=contamination,
+            random_state=42,
+            n_jobs=-1
+        )
+        self.model.fit(X_scaled)
+
+        os.makedirs("sentinel_xdr/models", exist_ok=True)
+        with open(self.model_path, "wb") as f:
+            pickle.dump(self.model, f)
+        with open(self.scaler_path, "wb") as f:
+            pickle.dump(self.scaler, f)
+
+        logger.info("Anomaly detector retrained and saved (contamination=%.3f)", contamination)
+
     def _train_baseline(self):
         """Train on synthetic normal behavior data."""
         logger.info("Training anomaly detector on baseline data...")
@@ -46,7 +85,7 @@ class AnomalyDetector:
 
         normal_data = []
         for _ in range(n_samples):
-            hour = np.random.choice(range(8, 22), p=[
+            hour = np.random.choice(range(8, 21), p=[
                 0.03, 0.05, 0.08, 0.10, 0.12, 0.12,
                 0.10, 0.10, 0.08, 0.08, 0.06, 0.05, 0.03
             ])

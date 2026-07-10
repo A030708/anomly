@@ -58,6 +58,26 @@ def sentinel_monitor(func):
         if extra_metadata:
             metadata.update(extra_metadata)
 
+        # Extract detailed payload for action transparency
+        payload_details = {}
+        try:
+            if request.args:
+                payload_details["args"] = dict(request.args)
+            if request.form:
+                # filter out sensitive keys
+                form_data = {k: v for k, v in request.form.items() if "password" not in k.lower()}
+                if form_data:
+                    payload_details["form"] = form_data
+            if request.is_json and request.json:
+                json_data = {k: v for k, v in request.json.items() if "password" not in k.lower()}
+                if json_data:
+                    payload_details["json"] = json_data
+        except Exception:
+            pass
+
+        if payload_details:
+            metadata["reason"] = metadata.get("reason", "") + f" Payload: {payload_details}"
+
         event_payload = {
             "source": "boltmart",
             "timestamp": datetime.now(timezone.utc).isoformat(),

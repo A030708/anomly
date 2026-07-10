@@ -35,9 +35,7 @@
         justify-content: center;
         gap: 3px;
     }
-    .tactic-header:hover {
-        background: linear-gradient(135deg, rgba(0,212,255,0.25), rgba(0,102,255,0.2));
-    }
+
     .tactic-count {
         font-size: 16px;
         font-weight: 700;
@@ -60,29 +58,19 @@
         position: relative;
         overflow: hidden;
     }
-    .technique-cell:hover {
-        background: rgba(255,255,255,0.08);
-        border-color: rgba(255,255,255,0.15);
-        color: var(--text-primary);
-        z-index: 5;
-        transform: scale(1.02);
-    }
+
     .technique-cell.detected {
         background: rgba(255,71,87,0.15);
         border-color: rgba(255,71,87,0.35);
         color: #ff8a96;
     }
-    .technique-cell.detected:hover {
-        background: rgba(255,71,87,0.25);
-    }
+
     .technique-cell.covered {
         background: rgba(0,212,255,0.1);
         border-color: rgba(0,212,255,0.25);
         color: #7fe8ff;
     }
-    .technique-cell.covered:hover {
-        background: rgba(0,212,255,0.18);
-    }
+
     .technique-cell.hunting {
         background: rgba(255,215,0,0.1);
         border-color: rgba(255,215,0,0.25);

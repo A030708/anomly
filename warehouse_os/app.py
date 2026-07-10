@@ -5,7 +5,7 @@ import io
 import json
 import smtplib
 from email.mime.text import MIMEText
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 from functools import wraps
 import requests as req
@@ -121,6 +121,9 @@ def create_app():
 
     # ---------------- AUTH ----------------
 
+    # Track failed logins: {email: {"count": int, "locked_until": datetime}}
+    LOGIN_LOCKOUTS = {}
+
     @app.route("/login", methods=["GET", "POST"])
     @sentinel_monitor
     def login():
@@ -135,17 +138,62 @@ def create_app():
                 .table("users")
                 .select("*")
                 .eq("email", email)
-                .eq("is_active", True)
                 .limit(1)
                 .execute()
             )
 
             user = resp.data[0] if resp.data else None
 
-            if not user or not check_password_hash(user["password_hash"], password):
+            if user and user.get("failed_attempts", 0) >= 5:
+                locked_until = user.get("last_login")
+                if locked_until:
+                    try:
+                        lock_time = datetime.fromisoformat(locked_until.replace("Z", "+00:00"))
+                        if datetime.now(timezone.utc) < lock_time + timedelta(minutes=30):
+                            remaining = int((lock_time + timedelta(minutes=30) - datetime.now(timezone.utc)).total_seconds() / 60)
+                            g.event_type = "BRUTE_FORCE_ATTEMPT"
+                            g.telemetry_metadata = {"is_anomalous": True, "reason": "account locked"}
+                            return render_template("login.html", error=f"Too many failed attempts. Try again in {remaining or 1} mins."), 429
+                    except Exception:
+                        pass
+                get_db().table("users").update({"failed_attempts": 0, "is_active": True}).eq("id", user["id"]).execute()
+                user["failed_attempts"] = 0
+
+            if not user or not user.get("is_active") or not check_password_hash(user["password_hash"], password):
                 g.event_type = "LOGIN_FAILED"
                 g.telemetry_metadata = {"email": email}
+                if user:
+                    attempts = (user.get("failed_attempts") or 0) + 1
+                    get_db().table("users").update({"failed_attempts": attempts}).eq("id", user["id"]).execute()
+                audit("LOGIN_FAILED", "auth", email, {"ip": request.headers.get("X-Forwarded-For", request.remote_addr)})
+
+                if email not in LOGIN_LOCKOUTS:
+                    LOGIN_LOCKOUTS[email] = {"count": 0, "locked_until": None}
+                LOGIN_LOCKOUTS[email]["count"] += 1
+
+                if LOGIN_LOCKOUTS[email]["count"] >= 5:
+                    LOGIN_LOCKOUTS[email]["locked_until"] = datetime.now(timezone.utc) + timedelta(minutes=30)
+                    g.event_type = "BRUTE_FORCE_ATTEMPT"
+                    g.telemetry_metadata = {"is_anomalous": True, "reason": "5 consecutive failed logins"}
+                    now_ts = datetime.now(timezone.utc).isoformat()
+                    if user:
+                        get_db().table("users").update({"is_active": False, "last_login": now_ts}).eq("id", user["id"]).execute()
+                    audit("BRUTE_FORCE_LOCKOUT", "auth", email, {"reason": "5 consecutive failed logins", "ip": request.headers.get("X-Forwarded-For", request.remote_addr)})
+                    lockout_html = f"""<!DOCTYPE html><html><head><meta charset='utf-8'></head><body style='margin:0;padding:0;background:#f0f2f5;font-family:Inter,system-ui,sans-serif;'>
+<table style='max-width:480px;margin:24px auto;background:white;border-radius:14px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.07);'><tr><td style='padding:24px 32px;background:linear-gradient(135deg,#dc2626,#991b1b);'>
+<h1 style='color:white;font-size:18px;margin:0;'>Account Locked</h1><p style='color:#fca5a5;margin:4px 0 0;font-size:13px;'>WarehouseOS Security Notice</p></td></tr>
+<tr><td style='padding:24px 32px;'><p style='color:#475569;font-size:14px;line-height:1.6;'>Hello,</p>
+<p style='color:#475569;font-size:14px;line-height:1.6;'>We detected <strong>5 consecutive failed login attempts</strong> on your account ({email}) in WarehouseOS.</p>
+<p style='color:#475569;font-size:14px;line-height:1.6;'>For security reasons, your account has been <strong style='color:#dc2626;'>temporarily locked for 30 minutes</strong>.</p>
+<p style='color:#475569;font-size:14px;line-height:1.6;'>If this was you, please wait 30 minutes and try again. If you didn't attempt this, please contact your administrator immediately.</p>
+<hr style='border:none;border-top:1px solid #e2e8f0;margin:16px 0;'>
+<p style='color:#94a3b8;font-size:12px;line-height:1.5;'>Timestamp: {datetime.now(timezone.utc).strftime('%d %b %Y at %H:%M UTC')}<br>IP: {request.headers.get('X-Forwarded-For', request.remote_addr)}<br>WarehouseOS — Security Notification</p></td></tr></table></body></html>"""
+                    _send_email(f"Account Locked — 30 min — {email}", "", to_email=email, html_body=lockout_html)
+                    return render_template("login.html", error="Too many failed attempts. Try again in 30 mins."), 429
+
                 return render_template("login.html", error="Invalid email or password"), 401
+
+            LOGIN_LOCKOUTS.pop(email, None)
 
             flask_session["user"] = {
                 "id": user["id"],
@@ -238,6 +286,16 @@ def create_app():
                 .data or []
             )
 
+            login_alerts = (
+                db.table("audit_log")
+                .select("*")
+                .in_("action", ["LOGIN_FAILED", "BRUTE_FORCE_LOCKOUT"])
+                .order("timestamp", desc=True)
+                .limit(10)
+                .execute()
+                .data or []
+            )
+
             total_products = len(all_products)
             total_stock_units = sum(int(p.get("stock_count") or 0) for p in all_products)
 
@@ -260,6 +318,7 @@ def create_app():
                 low_stock_count=low_stock_count,
                 low_stock_products=low_stock_products,
                 recent_security_events=recent_security_events,
+                login_alerts=login_alerts,
                 total_products=total_products,
                 total_stock_units=total_stock_units,
                 order_counts=order_counts,
@@ -729,12 +788,16 @@ def create_app():
 
     # ---------------- EMAIL NOTIFIER ----------------
 
-    def _send_email(subject, body):
+    def _send_email(subject, body, to_email=None, html_body=None):
         try:
-            msg = MIMEText(body, "plain", "utf-8")
+            to = to_email or Config.ADMIN_EMAIL
+            if html_body:
+                msg = MIMEText(html_body, "html", "utf-8")
+            else:
+                msg = MIMEText(body, "plain", "utf-8")
             msg["Subject"] = subject
             msg["From"] = Config.SMTP_FROM
-            msg["To"] = Config.ADMIN_EMAIL
+            msg["To"] = to
             with smtplib.SMTP(Config.SMTP_HOST, Config.SMTP_PORT) as server:
                 server.starttls()
                 server.login(Config.SMTP_USER, Config.SMTP_PASS)
@@ -910,16 +973,18 @@ def create_app():
     def stock_in():
         g.event_type = "STOCK_IN_VIEW"
 
-        products = get_db().table("products").select("*").order("name").execute().data or []
         po_id_param = request.args.get("po") or request.form.get("po_id")
-        selected_po = None
-        po_items = []
+        if not po_id_param:
+            flash("Select a purchase order to receive stock against.")
+            return redirect(url_for("purchase_orders_list"))
 
-        if po_id_param:
-            po_resp = get_db().table("purchase_orders").select("*").eq("id", po_id_param).limit(1).execute()
-            if po_resp.data:
-                selected_po = po_resp.data[0]
-                po_items = get_db().table("purchase_order_items").select("*").eq("po_id", po_id_param).execute().data or []
+        po_resp = get_db().table("purchase_orders").select("*").eq("id", po_id_param).limit(1).execute()
+        if not po_resp.data:
+            flash("Purchase order not found.")
+            return redirect(url_for("purchase_orders_list"))
+        selected_po = po_resp.data[0]
+        po_items = get_db().table("purchase_order_items").select("*").eq("po_id", po_id_param).execute().data or []
+        products = get_db().table("products").select("*").order("name").execute().data or []
 
         recent_stockins = (
             get_db().table("inventory_movements")
@@ -936,15 +1001,15 @@ def create_app():
             reason = request.form.get("reason", "Restock")
             po_item_id = request.form.get("po_item_id")
 
-            if not sku or quantity <= 0:
+            if not sku or quantity <= 0 or not po_item_id:
                 flash("Invalid stock-in data.")
-                return redirect(url_for("stock_in"))
+                return redirect(url_for("stock_in", po=po_id_param))
 
             product_resp = get_db().table("products").select("*").eq("sku", sku).limit(1).execute()
             product = product_resp.data[0] if product_resp.data else None
             if not product:
                 flash("Product not found.")
-                return redirect(url_for("stock_in"))
+                return redirect(url_for("stock_in", po=po_id_param))
 
             current_stock = int(product.get("stock_count") or 0)
             new_stock = current_stock + quantity
@@ -961,20 +1026,17 @@ def create_app():
                 "session_id": flask_session.get("session_id"),
             }).execute()
 
-            # Update PO item if receiving against a PO
-            if po_item_id and po_id_param:
-                item_resp = get_db().table("purchase_order_items").select("*").eq("id", po_item_id).limit(1).execute()
-                if item_resp.data:
-                    item = item_resp.data[0]
-                    new_received = item.get("received_qty", 0) + quantity
-                    get_db().table("purchase_order_items").update({"received_qty": new_received}).eq("id", po_item_id).execute()
-                    # Check if all items fully received → mark PO received
-                    all_items = get_db().table("purchase_order_items").select("*").eq("po_id", po_id_param).execute().data or []
-                    if all(it.get("received_qty", 0) >= it.get("ordered_qty", 0) for it in all_items):
-                        get_db().table("purchase_orders").update({"status": "received"}).eq("id", po_id_param).execute()
-                        po_data = get_db().table("purchase_orders").select("po_number").eq("id", po_id_param).limit(1).execute()
-                        po_num = po_data.data[0]["po_number"] if po_data.data else po_id_param
-                        flash(f"PO {po_num} fully received!")
+            item_resp = get_db().table("purchase_order_items").select("*").eq("id", po_item_id).limit(1).execute()
+            if item_resp.data:
+                item = item_resp.data[0]
+                new_received = item.get("received_qty", 0) + quantity
+                get_db().table("purchase_order_items").update({"received_qty": new_received}).eq("id", po_item_id).execute()
+                all_items = get_db().table("purchase_order_items").select("*").eq("po_id", po_id_param).execute().data or []
+                if all(it.get("received_qty", 0) >= it.get("ordered_qty", 0) for it in all_items):
+                    get_db().table("purchase_orders").update({"status": "received"}).eq("id", po_id_param).execute()
+                    po_data = get_db().table("purchase_orders").select("po_number").eq("id", po_id_param).limit(1).execute()
+                    po_num = po_data.data[0]["po_number"] if po_data.data else po_id_param
+                    flash(f"PO {po_num} fully received!")
 
             audit("STOCK_IN", "inventory", sku, {"quantity": quantity, "reason": reason})
 
@@ -998,7 +1060,7 @@ def create_app():
             )
 
             flash(f"Stock added: {quantity}x {sku}. New stock: {new_stock}")
-            return redirect(url_for("stock_in"))
+            return redirect(url_for("stock_in", po=po_id_param))
 
         return render_template(
             "stock_in.html",
@@ -1370,7 +1432,8 @@ def create_app():
     @sentinel_monitor
     def stop_attack():
         g.event_type = "EMERGENCY_STOP_ATTACK"
-        ip_to_block = request.json.get("ip_address")
+        payload = request.get_json(silent=True)
+        ip_to_block = payload.get("ip_address") if payload else None
         if ip_to_block:
             now = datetime.now(timezone.utc)
             from datetime import timedelta
@@ -1667,7 +1730,14 @@ def create_app():
             total = len(filtered_data)
             logs = filtered_data[(page - 1) * per_page : page * per_page]
         else:
-            total = query.count.execute().count if hasattr(query, 'count') else 0
+            count_query = table.select("*", count="exact")
+            if action_filter:
+                count_query = count_query.eq("action", action_filter)
+            if module_filter:
+                count_query = count_query.eq("module", module_filter)
+            if user_filter:
+                count_query = count_query.eq("username", user_filter)
+            total = count_query.execute().count or 0
             logs = (
                 query.order("timestamp", desc=True)
                 .range((page - 1) * per_page, page * per_page - 1)
@@ -1903,21 +1973,24 @@ def create_app():
 
                 audit("PO_CREATED", "purchase_orders", po_number, {"items": len(items_data), "total": total_value})
 
-                sup_name = next((s["name"] for s in suppliers if s["id"] == supplier_id), "Unknown")
-                prod_names = []
+                sup = next((s for s in suppliers if s["id"] == supplier_id), None)
+                sup_name = sup["name"] if sup else "Unknown"
+                sup_email = sup.get("contact_email") if sup else None
+                prod_rows = ""
                 for item in items_data:
                     p = next((x for x in products if x["sku"] == item["sku"]), None)
-                    prod_names.append(f"  {item['sku']} ({p['name'] if p else '?'}) x {item['ordered_qty']} @ ₹{item['unit_value']:,.0f}")
-                _send_email(
-                    f"Purchase Order Created: {po_number}",
-                    f"A new purchase order has been created.\n\n"
-                    f"PO Number: {po_number}\n"
-                    f"Supplier: {sup_name}\n"
-                    f"Total Value: ₹{total_value:,.0f}\n"
-                    f"Items:\n" + "\n".join(prod_names) + "\n\n"
-                    f"Created by: {current_user().get('username', 'Unknown')}\n"
-                    f"WarehouseOS — Purchase Order Notification"
-                )
+                    prod_rows += f"<tr><td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;'>{item['sku']}</td><td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;'>{p['name'] if p else '?'}</td><td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;text-align:center;'>{item['ordered_qty']}</td><td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;text-align:right;'>₹{item['unit_value']:,.0f}</td><td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;text-align:right;font-weight:600;'>₹{item['unit_value'] * item['ordered_qty']:,.0f}</td></tr>"
+                html = f"""<!DOCTYPE html><html><head><meta charset='utf-8'></head><body style='margin:0;padding:0;background:#f0f2f5;font-family:Inter,system-ui,sans-serif;'>
+<table style='max-width:600px;margin:24px auto;background:white;border-radius:14px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.07);'><tr><td style='padding:24px 32px;background:linear-gradient(135deg,#0f172a,#1e293b);'>
+<h1 style='color:white;font-size:18px;margin:0;'>New Purchase Order</h1><p style='color:#94a3b8;margin:4px 0 0;font-size:13px;'>PO {po_number}</p></td></tr>
+<tr><td style='padding:24px 32px;'><p style='color:#475569;font-size:14px;line-height:1.6;'>Dear {sup_name},<br><br>A new purchase order has been issued to you. Please review the details below and arrange shipment at your earliest convenience.</p>
+<table style='width:100%;border-collapse:collapse;margin:16px 0;'><tr><td style='padding:6px 0;color:#64748b;font-size:13px;'>PO Number</td><td style='padding:6px 0;font-size:13px;font-weight:600;text-align:right;'>{po_number}</td></tr>
+<tr><td style='padding:6px 0;color:#64748b;font-size:13px;'>Order Date</td><td style='padding:6px 0;font-size:13px;font-weight:600;text-align:right;'>{datetime.now(timezone.utc).strftime('%d %b %Y')}</td></tr>
+<tr><td style='padding:6px 0;color:#64748b;font-size:13px;'>Total Value</td><td style='padding:6px 0;font-size:13px;font-weight:700;text-align:right;color:#16a34a;'>₹{total_value:,.0f}</td></tr></table>
+<table style='width:100%;border-collapse:collapse;margin:16px 0;'><thead><tr style='background:#f8fafc;'><th style='padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;text-align:left;'>SKU</th><th style='padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;text-align:left;'>Product</th><th style='padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;text-align:center;'>Qty</th><th style='padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;text-align:right;'>Unit Price</th><th style='padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;text-align:right;'>Total</th></tr></thead><tbody>{prod_rows}</tbody></table>
+<p style='color:#475569;font-size:14px;line-height:1.6;'>If you have any questions regarding this order, please contact us at {Config.ADMIN_EMAIL or Config.SMTP_FROM or 'your account manager'}.</p><p style='color:#475569;font-size:14px;line-height:1.6;margin-top:4px;'>Thank you for your partnership.</p></td></tr>
+<tr><td style='padding:16px 32px;background:#f8fafc;text-align:center;color:#94a3b8;font-size:11px;'>WarehouseOS — Purchase Order Notification</td></tr></table></body></html>"""
+                _send_email(f"New Purchase Order: {po_number} — {sup_name}", "", to_email=sup_email, html_body=html)
 
                 flash(f"Purchase order {po_number} created.")
                 return redirect(url_for("purchase_orders_list"))

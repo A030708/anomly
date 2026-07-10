@@ -469,7 +469,42 @@ def send_user_suspended(email, reason):
 
 
 # ─────────────────────────────────────────────
-# 7. CHECKOUT BLOCKED EMAIL (to user)
+# 7. BRUTE FORCE ALERT EMAIL (to user)
+# ─────────────────────────────────────────────
+
+def send_brute_force_alert_email(email):
+    config = _get_smtp_config()
+    if not email:
+        return
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:Segoe UI,sans-serif;background:#f3f4f6;margin:0;padding:24px;">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);border-top:4px solid #f59e0b;">
+<div style="background:#fffbeb;padding:24px;text-align:center;">
+<h1 style="color:#b45309;margin:0;font-size:22px;">&#9888;&#65039; Security Alert</h1>
+</div>
+<div style="padding:32px;">
+<p style="font-size:14px;color:#374151;">We detected multiple failed login attempts to your BoltMart account.</p>
+<div style="background:#fffbeb;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #fde68a;">
+<p style="font-size:13px;color:#92400e;margin:0;"><strong>Action Taken:</strong> Your account has been temporarily locked for 30 minutes to protect your security.</p>
+</div>
+<p style="font-size:13px;color:#6b7280;">If this was you, you can try logging in again after 30 minutes. If you did not make these attempts, please change your password or contact our support team at <a href="mailto:support@boltmart.in" style="color:#1a56db;">support@boltmart.in</a>.</p>
+</div>
+<div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+<p style="font-size:12px;color:#9ca3af;margin:0;">BoltMart &mdash; Industrial &amp; Safety Equipment Supply</p>
+</div>
+</div>
+</body>
+</html>"""
+
+    _send_email(email, "Security Alert: Continuous Login Attempts", html,
+                "We detected continuous failed login attempts to your account. Your account is temporarily locked for 30 minutes for your safety.")
+
+
+# ─────────────────────────────────────────────
+# 8. CHECKOUT BLOCKED EMAIL (to user)
 # ─────────────────────────────────────────────
 
 def send_checkout_blocked_email(email, name):

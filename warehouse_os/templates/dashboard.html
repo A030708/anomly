@@ -111,6 +111,25 @@ document.addEventListener("DOMContentLoaded", function() {
         </tbody>
       </table>
     </div>
+
+    {% if login_alerts %}
+    <div class="dash-panel-header" style="margin-top:16px;"><span><i class="fa-solid fa-right-left" style="color:#dc2626;"></i> Security Alerts — Failed Logins</span></div>
+    <div class="wos-table-wrapper" style="border:none;">
+      <table class="wos-table">
+        <thead><tr><th>Time</th><th>Email</th><th>IP</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for alert in login_alerts %}
+          <tr>
+            <td style="font-size:12px;color:var(--wos-text-muted);">{{ alert.timestamp[:19].replace('T',' ') }}</td>
+            <td style="font-weight:600;font-size:13px;">{{ alert.affected_record }}</td>
+            <td style="font-family:monospace;font-size:12px;color:var(--wos-text-muted);">{{ alert.ip_address }}</td>
+            <td><span class="wos-badge {% if alert.action == 'BRUTE_FORCE_LOCKOUT' %}wos-badge-danger{% else %}wos-badge-warning{% endif %}" style="font-size:11px;">{{ 'LOCKED' if alert.action == 'BRUTE_FORCE_LOCKOUT' else 'FAILED' }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
   </div>
 
   <div class="dash-panel" style="display:flex;flex-direction:column;gap:12px;">
@@ -219,10 +238,7 @@ document.addEventListener("DOMContentLoaded", function() {
       <i class="fa-solid fa-file-csv" style="color:var(--wos-accent);width:20px;"></i>
       <span><strong style="display:block;font-size:14px;">Export Data</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Download CSV reports</small></span>
     </a>
-    <a href="{{ url_for('stock_in') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
-      <i class="fa-solid fa-arrow-down" style="color:var(--wos-success);width:20px;"></i>
-      <span><strong style="display:block;font-size:14px;">Stock Receiving</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Add incoming stock to warehouse</small></span>
-    </a>
+
     <a href="{{ url_for('purchase_orders_list') }}" class="wos-btn wos-btn-secondary" style="width:100%;justify-content:flex-start;padding:12px 16px;">
       <i class="fa-solid fa-file-invoice" style="color:var(--wos-secondary);width:20px;"></i>
       <span><strong style="display:block;font-size:14px;">Purchase Orders</strong><small style="display:block;font-size:11px;color:var(--wos-text-muted);font-weight:400;">Track supplier orders</small></span>

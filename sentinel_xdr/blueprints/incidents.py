@@ -148,6 +148,21 @@ def resolve_incident(incident_id):
     return jsonify({"success": True, "action": action})
 
 
+@incidents_bp.route("/delete_all", methods=["POST"])
+def delete_all_incidents():
+    try:
+        supa = get_supabase()
+        all_incidents = supa.table("threat_incidents").select("incident_id").execute()
+        ids = [row["incident_id"] for row in (all_incidents.data or [])]
+        if ids:
+            supa.table("threat_incidents").delete().in_("incident_id", ids).execute()
+        flash("All incidents deleted successfully", "success")
+    except Exception as e:
+        logger.error("Failed to delete all incidents: %s", e)
+        flash("Failed to delete incidents", "danger")
+    return redirect(url_for("incidents.list_incidents"))
+
+
 @incidents_bp.route("/create", methods=["GET", "POST"])
 def create_incident():
     flash("Incident creation form - implement as needed", "info")

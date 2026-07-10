@@ -27,11 +27,7 @@
     .incident-card.high::before    { background: #ff6b35; }
     .incident-card.medium::before  { background: #ffd700; }
     .incident-card.low::before     { background: #00d4ff; }
-    .incident-card:hover {
-        background: var(--bg-card-hover);
-        border-color: rgba(255,255,255,0.12);
-        transform: translateY(-1px);
-    }
+
     .incident-title {
         font-size: 14px;
         font-weight: 600;
@@ -153,8 +149,7 @@
     </select>
     <select class="filter-select" id="statusFilter">
         <option value="">All Statuses</option>
-        <option>Open</option><option>Investigating</option>
-        <option>Resolved</option><option>Closed</option>
+        <option>Open</option><option>Resolved</option>
     </select>
     <div class="view-toggle">
         <button class="toggle-btn active" id="cardViewBtn"
@@ -166,7 +161,13 @@
             <i class="fas fa-list"></i>
         </button>
     </div>
-
+    <form method="POST" action="{{ url_for('incidents.delete_all_incidents') }}" style="margin-left:auto;display:inline;" onsubmit="return confirm('Delete ALL incidents? This cannot be undone.')">
+        <button type="submit"
+                class="btn-primary-custom justify-content-center"
+                style="background:rgba(255,71,87,0.15);border:1px solid rgba(255,71,87,0.3);color:#ff4757;padding:6px 14px;font-size:12px;">
+            <i class="fas fa-trash"></i> Delete All
+        </button>
+    </form>
 </div>
 
 <!-- CARD VIEW -->

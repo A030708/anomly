@@ -48,7 +48,7 @@
                             <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">
                                 <i class="{{ icon }} me-1"></i>{{ label }}
                             </div>
-                            <div style="font-size:14px;font-weight:500;font-family:{{ 'monospace' if 'IP' in label or 'Port' in label else 'inherit' }};">
+                            <div style="font-size:14px;font-weight:500;font-family:{{ 'monospace' if 'IP' in label or 'Port' in label else 'inherit' }};color:#ffffff;">
                                 {{ value }}
                             </div>
                         </div>
@@ -60,7 +60,7 @@
                 {% if alert.raw_log %}
                 <div>
                     <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Raw Log</div>
-                    <pre style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:14px;font-size:11px;color:#00ff88;overflow-x:auto;max-height:200px;">{{ alert.raw_log }}</pre>
+                    <pre style="background:#1e1e2f;border:1px solid rgba(0,212,255,0.2);border-radius:8px;padding:14px;font-size:11px;color:#00d4ff;overflow-x:auto;max-height:200px;">{{ alert.raw_log }}</pre>
                 </div>
                 {% endif %}
             </div>
@@ -110,23 +110,59 @@
                     <i class="fas fa-check-circle"></i> Mark Resolved
                 </a>
                 {% endif %}
-                <a href="{{ url_for('incidents.create_incident') }}?alert_id={{ alert.id }}"
-                   class="btn-primary-custom justify-content-center"
-                   style="background:rgba(255,107,53,0.2);border:1px solid rgba(255,107,53,0.3);color:#ff6b35;">
-                    <i class="fas fa-fire"></i> Create Incident
-                </a>
-                <a href="{{ url_for('cases.create_case') }}?alert_id={{ alert.id }}"
-                   class="btn-primary-custom justify-content-center"
-                   style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);color:#a855f7;">
-                    <i class="fas fa-folder-plus"></i> Add to Case
-                </a>
+
+
                 <button class="btn-primary-custom justify-content-center"
                         style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary);"
                         onclick="window.print()">
                     <i class="fas fa-print"></i> Export PDF
                 </button>
+                <hr style="border-color:rgba(255,255,255,0.08);margin:8px 0;">
+                <button id="btnMarkFP"
+                        class="btn-primary-custom justify-content-center"
+                        style="background:rgba(255,71,87,0.15);border:1px solid rgba(255,71,87,0.3);color:#ff4757;{{ 'display:none' if feedback and feedback.is_false_positive }}">
+                    <i class="fas fa-times-circle"></i> Mark False Positive
+                </button>
+                <button id="btnMarkTP"
+                        class="btn-primary-custom justify-content-center"
+                        style="background:rgba(0,255,136,0.15);border:1px solid rgba(0,255,136,0.3);color:#00ff88;{{ 'display:none' if feedback and not feedback.is_false_positive }}">
+                    <i class="fas fa-check-circle"></i> Mark True Positive
+                </button>
+                <div id="feedbackStatus" style="font-size:11px;color:var(--text-muted);text-align:center;{{ 'display:block' if feedback else 'display:none' }}">
+                    {% if feedback %}
+                        <span style="color:{{ '#ff4757' if feedback.is_false_positive else '#00ff88' }}">
+                            <i class="fas {{ 'fa-times-circle' if feedback.is_false_positive else 'fa-check-circle' }}"></i>
+                            Marked as {{ 'False Positive' if feedback.is_false_positive else 'True Positive' }}
+                        </span>
+                        {% if feedback.notes %}
+                        <br><span style="font-size:10px;">{{ feedback.notes }}</span>
+                        {% endif %}
+                    {% endif %}
+                </div>
             </div>
         </div>
+
+        <script>
+        document.getElementById('btnMarkFP')?.addEventListener('click', function() {
+            submitFeedback(true);
+        });
+        document.getElementById('btnMarkTP')?.addEventListener('click', function() {
+            submitFeedback(false);
+        });
+        function submitFeedback(isFP) {
+            fetch("{{ url_for('alerts.submit_feedback', alert_id=alert.id) }}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({is_false_positive: isFP, notes: ''})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+        }
+        </script>
 
         <!-- Metadata -->
         <div class="card mb-4">

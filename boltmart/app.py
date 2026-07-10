@@ -2,7 +2,7 @@ import os
 import sys
 import json
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -86,7 +86,7 @@ def create_app():
             if subtotal < (coupon.get("min_order_value") or 0):
                 return None, f"Minimum order value of Rs {coupon['min_order_value']:.0f} required"
             if coupon["discount_type"] == "percentage":
-                discount = round(subtotal * coupon["discount_value"] / 100, 2)
+                discount = min(round(subtotal * coupon["discount_value"] / 100, 2), subtotal)
             else:
                 discount = min(coupon["discount_value"], subtotal)
             return coupon, discount
@@ -214,6 +214,9 @@ def create_app():
                 return render_template("register.html", error="Email already exists.")
         return render_template("register.html")
 
+    # Track failed logins: {email: {"count": int, "locked_until": datetime}}
+    LOGIN_LOCKOUTS = {}
+
     @app.route("/login", methods=["GET", "POST"])
     @sentinel_monitor
     def login():
@@ -221,10 +224,22 @@ def create_app():
         if request.method == "POST":
             email = request.form.get("email")
             password = request.form.get("password")
-            
+            # Check lockout
+            lockout_info = LOGIN_LOCKOUTS.get(email)
+            if lockout_info and lockout_info.get("locked_until"):
+                if datetime.now(timezone.utc) < lockout_info["locked_until"]:
+                    g.event_type = "BRUTE_FORCE_ATTEMPT"
+                    g.telemetry_metadata = {"is_anomalous": True, "reason": "5 consecutive failed logins"}
+                    remaining_mins = int((lockout_info["locked_until"] - datetime.now(timezone.utc)).total_seconds() / 60)
+                    return render_template("login.html", error=f"Too many failed attempts. Try again in {remaining_mins or 1} mins.")
+                else:
+                    LOGIN_LOCKOUTS.pop(email, None)
+
             customer = get_customer(email)
             if customer and check_password_hash(customer["password"], password):
+                LOGIN_LOCKOUTS.pop(email, None)
                 if customer.get("blocked"):
+                    g.event_type = "CUSTOMER_LOGIN_FAILED"
                     return render_template("login.html", error="Account is suspended.")
                 # Trigger OTP and send via email
                 otp_code = set_otp(email)
@@ -236,6 +251,24 @@ def create_app():
                     print(f"[OTP] Email send FAILED for {email}: {mail_err}", flush=True)
                 return redirect(url_for("verify_otp_route", email=email))
             else:
+                g.event_type = "CUSTOMER_LOGIN_FAILED"
+                
+                # Increment failed attempts
+                if email not in LOGIN_LOCKOUTS:
+                    LOGIN_LOCKOUTS[email] = {"count": 0, "locked_until": None}
+                LOGIN_LOCKOUTS[email]["count"] += 1
+                
+                if LOGIN_LOCKOUTS[email]["count"] >= 5:
+                    LOGIN_LOCKOUTS[email]["locked_until"] = datetime.now(timezone.utc) + timedelta(minutes=30)
+                    g.event_type = "BRUTE_FORCE_ATTEMPT"
+                    g.telemetry_metadata = {"is_anomalous": True, "reason": "5 consecutive failed logins"}
+                    try:
+                        from boltmart.notifier import send_brute_force_alert_email
+                        threading.Thread(target=send_brute_force_alert_email, args=(email,), daemon=True).start()
+                    except Exception:
+                        pass
+                    return render_template("login.html", error="Too many failed attempts. Try again in 30 mins.")
+
                 return render_template("login.html", error="Invalid credentials.")
         return render_template("login.html")
         
@@ -731,7 +764,12 @@ def create_app():
 
             get_db().table("orders").insert(order_record).execute()
 
-            if payment_method in ("cod", "wallet"):
+            flask_session.pop("cart", None)
+            flask_session.pop("wishlist", None)
+            flask_session.pop("coupon_code", None)
+            flask_session.pop("coupon_discount", None)
+
+            if payment_method == "cod":
                 threading.Thread(target=send_inapp_notifications, args=(order_record,), daemon=True).start()
                 threading.Thread(
                     target=_send_notification,
@@ -765,7 +803,7 @@ def create_app():
         if not order:
             return "Order not found", 404
 
-        if order["payment_method"] in ("cod", "wallet"):
+        if order["payment_method"] == "cod":
             return redirect(url_for("order_confirmation", order_id=order_id))
 
         if not Config.RAZORPAY_KEY_ID or not Config.RAZORPAY_KEY_SECRET:
