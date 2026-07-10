@@ -2,7 +2,7 @@ services:
   - type: web
     name: sentinel-xdr
     runtime: docker
-    repo: https://github.com/YOUR_USERNAME/YOUR_REPO
+    repo: https://github.com/abhiramkm8586/anomaly
     branch: main
     dockerfilePath: ./Dockerfile
     dockerCommand: gunicorn --bind 0.0.0.0:5003 --worker-class eventlet --workers 1 --timeout 120 "sentinel_xdr.app:app"
@@ -42,7 +42,7 @@ services:
   - type: web
     name: boltmart
     runtime: docker
-    repo: https://github.com/YOUR_USERNAME/YOUR_REPO
+    repo: https://github.com/abhiramkm8586/anomaly
     branch: main
     dockerfilePath: ./Dockerfile
     dockerCommand: gunicorn --bind 0.0.0.0:5001 --worker-class eventlet --workers 1 --timeout 120 "boltmart.app:create_app()"
@@ -80,7 +80,7 @@ services:
   - type: web
     name: warehouse-os
     runtime: docker
-    repo: https://github.com/YOUR_USERNAME/YOUR_REPO
+    repo: https://github.com/abhiramkm8586/anomaly
     branch: main
     dockerfilePath: ./Dockerfile
     dockerCommand: gunicorn --bind 0.0.0.0:5002 --worker-class eventlet --workers 1 --timeout 120 "warehouse_os.app:app"

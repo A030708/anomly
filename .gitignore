@@ -18,5 +18,3 @@ build/
 .venv/
 venv/
 
-# Docker
-.dockerignore
